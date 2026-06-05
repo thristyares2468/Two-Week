@@ -120,6 +120,10 @@ export class NetworkClient extends EventTarget {
     this.send("combat:reload");
   }
 
+  dropFromBus() {
+    this.send("player:dropFromBus");
+  }
+
   pickup(lootId) {
     this.send("loot:pickup", { lootId });
   }

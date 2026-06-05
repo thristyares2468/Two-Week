@@ -47,6 +47,9 @@ function createPlayer(socketId, name, index = 0, options = {}) {
     alive: true,
     spectator: false,
     isBot: Boolean(options.isBot),
+    onBus: false,
+    hasDropped: false,
+    canFight: false,
     health: 100,
     shield: options.isBot ? 0 : 50,
     materials: options.materials || 80,
@@ -82,6 +85,9 @@ function resetPlayerForMatch(player, spawn, mode) {
   player.grounded = player.y <= 0.01;
   player.alive = true;
   player.spectator = false;
+  player.onBus = false;
+  player.hasDropped = mode === "practice" || mode === "sandbox";
+  player.canFight = mode === "practice" || mode === "sandbox";
   player.health = 100;
   player.shield = player.isBot ? 0 : 50;
   player.materials = mode === "sandbox" ? 9999 : mode === "practice" ? 400 : 90;
@@ -117,6 +123,9 @@ function serializePlayer(player) {
     alive: player.alive,
     spectator: player.spectator,
     isBot: player.isBot,
+    onBus: Boolean(player.onBus),
+    canFight: Boolean(player.canFight),
+    heldWeaponId: getHeldItem(player) && getHeldItem(player).slotType === "weapon" ? getHeldItem(player).weaponId : null,
     selectedSlot: player.selectedSlot,
     materials: player.materials,
     eliminations: player.eliminations

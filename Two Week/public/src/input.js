@@ -40,6 +40,7 @@ export class InputController extends EventTarget {
       if (event.code === "KeyX") this.selectBuild("ramp");
       if (event.code === "KeyC") this.selectBuild("floor");
       if (event.code === "KeyV") this.selectBuild("roof");
+      if (event.code === "Space") this.push("dropFromBus");
       if (event.code === "KeyE") this.push("interact");
       if (event.code === "KeyG") this.push("useItem");
       if (event.code === "KeyR") {
@@ -77,7 +78,7 @@ export class InputController extends EventTarget {
     document.addEventListener("mousemove", (event) => {
       if (document.pointerLockElement !== this.canvas || this.paused) return;
       const sensitivity = this.settings.values.mouseSensitivity;
-      this.yaw -= event.movementX * sensitivity;
+      this.yaw += event.movementX * sensitivity;
       const invert = this.settings.values.invertY ? -1 : 1;
       this.pitch -= event.movementY * sensitivity * invert;
       this.pitch = clamp(this.pitch, -0.9, 0.55);

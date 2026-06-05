@@ -21,7 +21,7 @@ function findPlayerHit(room, shooter, origin, dir, maxDistance, blockedDistance)
   let closest = null;
   const candidates = [...room.players.values(), ...room.dummies];
   for (const target of candidates) {
-    if (!target.alive || target.id === shooter.id) continue;
+    if (!target.alive || !target.canFight || target.id === shooter.id) continue;
     const radius = target.isBot ? 1.35 : 1.25;
     const center = { x: target.x, y: target.y + 1.55, z: target.z };
     const t = raySphere(origin, dir, center, radius, maxDistance);
@@ -34,6 +34,7 @@ function findPlayerHit(room, shooter, origin, dir, maxDistance, blockedDistance)
 
 function canFire(player, weapon, time) {
   if (!player.alive) return { ok: false, reason: "You are eliminated." };
+  if (!player.canFight) return { ok: false, reason: player.onBus ? "Jump from the bus before fighting." : "Combat starts after the drop." };
   if (player.reloadEndsAt > time) return { ok: false, reason: "Reloading." };
   const minInterval = 1000 / weapon.stats.fireRate;
   if (time - player.lastFireAt < minInterval * 0.88) return { ok: false, reason: "Firing too fast." };

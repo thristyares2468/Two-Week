@@ -1,4 +1,4 @@
-const { RoomManager, serializeRoom, serializeSnapshot, updateDropState } = require("./rooms");
+const { RoomManager, dropPlayerFromBus, serializeRoom, serializeSnapshot, updateDropState } = require("./rooms");
 const { SERVER_TICK_RATE, SNAPSHOT_RATE, now } = require("./utils");
 const {
   applyDamage,
@@ -136,7 +136,18 @@ function attachGameServer(io) {
     socket.on("player:input", (payload) => {
       const room = getRoomForSocket(socket);
       const player = room && room.players.get(socket.id);
-      if (player) setInput(player, payload);
+      if (player) {
+        if (payload && payload.jump) dropPlayerFromBus(room, player);
+        setInput(player, payload);
+      }
+    });
+
+    socket.on("player:dropFromBus", () => {
+      const room = getRoomForSocket(socket);
+      const player = room && room.players.get(socket.id);
+      if (player && dropPlayerFromBus(room, player)) {
+        socket.emit("connection:state", { connected: true, id: socket.id, roomCode: room.roomCode, dropped: true });
+      }
     });
 
     socket.on("inventory:select", (payload = {}) => {
@@ -157,6 +168,10 @@ function attachGameServer(io) {
       const room = getRoomForSocket(socket);
       const player = room && room.players.get(socket.id);
       if (!room || !player || room.status !== "playing") return;
+      if (!player.canFight) {
+        socket.emit("server:error", player.onBus ? "Jump from the bus before fighting." : "Combat starts after the drop.");
+        return;
+      }
       const result = fireHitscan(room, player, payload);
       if (!result.ok) {
         socket.emit("server:error", result.reason);
@@ -181,6 +196,10 @@ function attachGameServer(io) {
       const room = getRoomForSocket(socket);
       const player = room && room.players.get(socket.id);
       if (!room || !player) return;
+      if (!player.canFight) {
+        socket.emit("server:error", "Drop before looting.");
+        return;
+      }
       const result = pickupLoot(room, player, payload.lootId);
       if (!result.ok) {
         socket.emit("server:error", result.reason);
@@ -193,6 +212,10 @@ function attachGameServer(io) {
       const room = getRoomForSocket(socket);
       const player = room && room.players.get(socket.id);
       if (!player) return;
+      if (!player.canFight) {
+        socket.emit("server:error", "Drop before using items.");
+        return;
+      }
       const result = useConsumable(player);
       if (!result.ok) {
         socket.emit("server:error", result.reason);
@@ -203,6 +226,10 @@ function attachGameServer(io) {
       const room = getRoomForSocket(socket);
       const player = room && room.players.get(socket.id);
       if (!room || !player || room.status !== "playing") return;
+      if (!player.canFight) {
+        socket.emit("server:error", "Drop before building.");
+        return;
+      }
       const result = placeBuild(room, player, payload);
       if (!result.ok) {
         socket.emit("server:error", result.reason);
@@ -214,7 +241,7 @@ function attachGameServer(io) {
     socket.on("build:damage", (payload = {}) => {
       const room = getRoomForSocket(socket);
       const player = room && room.players.get(socket.id);
-      if (!room || !player || !player.alive) return;
+      if (!room || !player || !player.alive || !player.canFight) return;
       const result = damageBuild(room, payload.buildId, 25);
       if (result.ok) {
         io.to(room.roomCode).emit("build:update", {
@@ -249,7 +276,7 @@ function attachGameServer(io) {
         const dropPhase = updateDropState(room);
         for (const player of room.players.values()) {
           finishReloadIfReady(player);
-          if (dropPhase !== "bus") applyInput(player, room, dt);
+          if (dropPhase !== "bus" || player.hasDropped) applyInput(player, room, dt);
           applyStormDamage(room, player, dt, io, addKillFeed);
         }
         for (const event of updateBots(room, dt)) {
@@ -283,7 +310,7 @@ function attachGameServer(io) {
 }
 
 function applyStormDamage(room, player, dt, io, addKillFeed) {
-  if (!player.alive || !isOutsideStorm(room.storm, player)) {
+  if (!player.alive || !player.canFight || !isOutsideStorm(room.storm, player)) {
     player.stormClock = 0;
     return;
   }

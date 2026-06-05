@@ -534,7 +534,9 @@ function pieceName(piece) {
 
 function dropLabel(snapshot) {
   if (snapshot.dropState && snapshot.dropState.phase === "spawnIsland") return "Spawn Island";
-  if (snapshot.dropState && snapshot.dropState.phase === "bus") return "Battle Bus";
+  if (snapshot.dropState && snapshot.dropState.phase === "bus") {
+    return snapshot.self && snapshot.self.onBus ? "Battle Bus: Space to drop" : "Dropping";
+  }
   if (!snapshot.self || snapshot.self.alive) return snapshot.status;
   return "Spectating";
 }

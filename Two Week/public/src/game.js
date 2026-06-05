@@ -169,7 +169,7 @@ export class TwoWeeksGame {
 
     this.handleNearestLoot(localState);
     const preview = this.buildings.updatePreview({
-      enabled: this.input.buildMode && localState && localState.alive,
+      enabled: this.input.buildMode && localState && localState.alive && localState.canFight,
       type: this.input.buildPiece,
       rotation: this.input.buildRotation,
       player: localState,
@@ -193,20 +193,38 @@ export class TwoWeeksGame {
         continue;
       }
       if (!this.snapshot || this.snapshot.status !== "playing") continue;
+      const self = this.snapshot.self;
+      if (action.type === "dropFromBus") {
+        this.network.dropFromBus();
+        continue;
+      }
       if (action.type === "selectSlot") this.network.selectSlot(action.slot);
       if (action.type === "reload") this.network.reload();
       if (action.type === "useItem") this.network.useItem();
       if (action.type === "interact" && this.nearestLoot) {
+        if (self && !self.canFight) {
+          this.ui.toast("Drop before looting.");
+          continue;
+        }
         this.network.pickup(this.nearestLoot.id);
         this.audio.pickup();
       }
       if (action.type === "fire") {
+        if (self && !self.canFight) {
+          this.ui.toast(self.onBus ? "Press Space to jump from the bus." : "Combat starts after the drop.");
+          this.audio.denied();
+          continue;
+        }
         this.network.fire({ yaw: this.input.yaw, pitch: this.input.pitch });
-        const self = this.snapshot.self;
         const item = self && self.inventory ? self.inventory[self.selectedSlot] : null;
         this.audio.shoot(item ? item.weaponId : "pistol");
       }
       if (action.type === "placeBuild") {
+        if (self && !self.canFight) {
+          this.audio.denied();
+          this.ui.toast("Drop before building.");
+          continue;
+        }
         if (preview && preview.valid) {
           this.network.placeBuild({
             type: preview.type,
@@ -224,8 +242,12 @@ export class TwoWeeksGame {
 
   handleNearestLoot(localState) {
     this.nearestLoot = null;
-    if (!localState || !localState.alive || !this.snapshot.loot) {
-      this.ui.showInteract("");
+    if (localState && localState.alive && localState.onBus) {
+      this.ui.showInteract("Press Space to jump from the bus");
+      return;
+    }
+    if (!localState || !localState.alive || !localState.canFight || !this.snapshot.loot) {
+      this.ui.showInteract(localState && localState.alive ? "Waiting for drop" : "");
       return;
     }
     let best = null;
