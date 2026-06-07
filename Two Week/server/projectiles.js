@@ -1,7 +1,7 @@
-const { WEAPON_STATS, clamp, normalizeAngle, randomFloat } = require("./utils");
+const { WEAPON_STATS, PLAYER_HEIGHT, PLAYER_RADIUS, clamp, normalizeAngle, randomFloat } = require("./utils");
 const { applyDamage, getHeldWeapon } = require("./playerState");
 const { damageBuild } = require("./buildingServer");
-const { getClosestBuildHit, getClosestStaticHit, raySphere } = require("./collision");
+const { getClosestBuildHit, raySphere } = require("./collision");
 
 function directionFromAngles(yaw, pitch) {
   const cp = Math.cos(pitch);
@@ -21,9 +21,9 @@ function findPlayerHit(room, shooter, origin, dir, maxDistance, blockedDistance)
   let closest = null;
   const candidates = [...room.players.values(), ...room.dummies];
   for (const target of candidates) {
-    if (!target.alive || !target.canFight || target.id === shooter.id) continue;
-    const radius = target.isBot ? 1.35 : 1.25;
-    const center = { x: target.x, y: target.y + 1.55, z: target.z };
+    if (!target.alive || target.id === shooter.id) continue;
+    const radius = target.isBot ? PLAYER_RADIUS * 1.15 : PLAYER_RADIUS;
+    const center = { x: target.x, y: target.y + PLAYER_HEIGHT * 0.54, z: target.z };
     const t = raySphere(origin, dir, center, radius, maxDistance);
     if (t === null) continue;
     if (blockedDistance !== null && t > blockedDistance) continue;
@@ -34,7 +34,6 @@ function findPlayerHit(room, shooter, origin, dir, maxDistance, blockedDistance)
 
 function canFire(player, weapon, time) {
   if (!player.alive) return { ok: false, reason: "You are eliminated." };
-  if (!player.canFight) return { ok: false, reason: player.onBus ? "Jump from the bus before fighting." : "Combat starts after the drop." };
   if (player.reloadEndsAt > time) return { ok: false, reason: "Reloading." };
   const minInterval = 1000 / weapon.stats.fireRate;
   if (time - player.lastFireAt < minInterval * 0.88) return { ok: false, reason: "Firing too fast." };
@@ -60,7 +59,7 @@ function fireHitscan(room, player, payload = {}) {
 
   const origin = {
     x: player.x + Math.sin(yaw) * 0.9,
-    y: player.y + 1.65,
+    y: player.y + PLAYER_HEIGHT * 0.58,
     z: player.z + Math.cos(yaw) * 0.9
   };
   const pellets = stats.pellets || 1;
@@ -73,9 +72,7 @@ function fireHitscan(room, player, payload = {}) {
     const shotPitch = pitch + randomFloat(-stats.spread, stats.spread) * spreadScale;
     const dir = normalizeVector(directionFromAngles(shotYaw, shotPitch));
     const buildHit = getClosestBuildHit(room, origin, dir, stats.range);
-    const staticHit = getClosestStaticHit(origin, dir, stats.range);
-    const closestBlocker = getClosestBlocker(buildHit, staticHit);
-    const blockedDistance = closestBlocker ? closestBlocker.distance : null;
+    const blockedDistance = buildHit ? buildHit.distance : null;
     const playerHit = findPlayerHit(room, player, origin, dir, stats.range, blockedDistance);
     let endDistance = stats.range;
 
@@ -94,23 +91,16 @@ function fireHitscan(room, player, payload = {}) {
         eliminated: outcome.eliminated,
         distance: playerHit.distance
       });
-    } else if (closestBlocker && closestBlocker.type === "build") {
-      endDistance = closestBlocker.distance;
-      const buildOutcome = damageBuild(room, closestBlocker.hit.piece.id, stats.buildDamage);
+    } else if (buildHit) {
+      endDistance = buildHit.distance;
+      const buildOutcome = damageBuild(room, buildHit.piece.id, stats.buildDamage);
       anyHit = true;
       results.push({
         type: "build",
-        buildId: closestBlocker.hit.piece.id,
+        buildId: buildHit.piece.id,
         damage: stats.buildDamage,
         destroyed: Boolean(buildOutcome.destroyed),
-        distance: closestBlocker.distance
-      });
-    } else if (closestBlocker && closestBlocker.type === "static") {
-      endDistance = closestBlocker.distance;
-      results.push({
-        type: "world",
-        colliderName: closestBlocker.hit.collider.name,
-        distance: closestBlocker.distance
+        distance: buildHit.distance
       });
     }
 
@@ -133,14 +123,6 @@ function fireHitscan(room, player, payload = {}) {
     ammoInMag: held.item.ammoInMag,
     results
   };
-}
-
-function getClosestBlocker(buildHit, staticHit) {
-  const blockers = [];
-  if (buildHit) blockers.push({ type: "build", hit: buildHit, distance: buildHit.distance });
-  if (staticHit) blockers.push({ type: "static", hit: staticHit, distance: staticHit.distance });
-  blockers.sort((a, b) => a.distance - b.distance);
-  return blockers[0] || null;
 }
 
 module.exports = {
