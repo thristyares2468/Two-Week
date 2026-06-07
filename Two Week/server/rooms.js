@@ -327,7 +327,7 @@ function updateDropState(room) {
         const spawn = makeSpawn(index, count);
         if (!player.hasDropped) {
           player.x = spawn.x;
-          player.y = 30;
+          player.y = spawn.y;
           player.z = spawn.z;
           player.vy = -5;
           player.yaw = spawn.yaw;

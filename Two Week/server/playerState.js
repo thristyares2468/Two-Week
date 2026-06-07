@@ -75,7 +75,8 @@ function createPlayer(socketId, name, index = 0, options = {}) {
 
 function resetPlayerForMatch(player, spawn, mode) {
   player.x = spawn.x;
-  player.y = spawn.y || 0;
+  const groundY = terrainHeightAt(spawn.x, spawn.z);
+  player.y = Math.max(spawn.y || 0, groundY);
   player.z = spawn.z;
   player.vx = 0;
   player.vy = 0;
@@ -310,10 +311,12 @@ function countAliveContestants(room) {
 function makeSpawn(index, count) {
   const angle = (index / Math.max(1, count)) * Math.PI * 2;
   const radius = 42 + (index % 4) * 10;
+  const x = Math.cos(angle) * radius;
+  const z = Math.sin(angle) * radius;
   return {
-    x: Math.cos(angle) * radius,
-    y: 24,
-    z: Math.sin(angle) * radius,
+    x,
+    y: terrainHeightAt(x, z) + 24,
+    z,
     yaw: angle + Math.PI
   };
 }
@@ -328,7 +331,7 @@ function makePracticeDummies(count = 5) {
     });
     resetPlayerForMatch(dummy, {
       x: Math.cos(angle) * 28,
-      y: 0,
+      y: terrainHeightAt(Math.cos(angle) * 28, Math.sin(angle) * 28),
       z: Math.sin(angle) * 28,
       yaw: angle + Math.PI
     }, "practice");

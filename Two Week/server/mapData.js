@@ -181,27 +181,10 @@ const LOOT_ZONES = MAP_POIS.map((poi) => ({
   ammoBoxes: makeAnchors(poi, "ammo", "ammoBox")
 }));
 
-function terrainHeightAt(x, z) {
-  const hills = [
-    { x: -86, z: 55, r: 54, h: 4.2 },
-    { x: -24, z: 83, r: 40, h: 3.4 },
-    { x: 92, z: -14, r: 48, h: 2.2 },
-    { x: 8, z: -86, r: 58, h: 1.6 }
-  ];
-  let height = Math.sin(x * 0.035) * 0.22 + Math.cos(z * 0.03) * 0.18;
-  for (const hill of hills) {
-    const d = Math.hypot(x - hill.x, z - hill.z);
-    const t = Math.max(0, 1 - d / hill.r);
-    height += hill.h * t * t;
-  }
-  return Math.max(0, Number(height.toFixed(3)));
-}
-
 module.exports = {
   FIELD_CONTAINERS,
   FIELD_LOOT_ANCHORS,
   LOOT_ZONES,
   MAP_POIS,
-  STATIC_COLLIDERS,
-  terrainHeightAt
+  STATIC_COLLIDERS
 };

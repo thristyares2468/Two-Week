@@ -15,6 +15,9 @@ export class InputController extends EventTarget {
     this.buildRotation = 0;
     this.active = false;
     this.paused = false;
+    this.settings.addEventListener("change", () => {
+      this.keys.clear();
+    });
     this.bind();
   }
 
@@ -28,22 +31,21 @@ export class InputController extends EventTarget {
         this.push("pause", { paused: this.paused });
       }
       if (!this.active) return;
-      if (event.code === "KeyM") this.push("toggleMap");
-      if (event.code >= "Digit1" && event.code <= "Digit5") {
-        this.push("selectSlot", { slot: Number(event.code.slice(-1)) - 1 });
+      if (this.matches(event.code, "toggleMap")) this.push("toggleMap");
+      for (let i = 1; i <= 5; i += 1) {
+        if (this.matches(event.code, `slot${i}`)) this.push("selectSlot", { slot: i - 1 });
       }
-      if (event.code === "KeyQ") {
+      if (this.matches(event.code, "buildMode")) {
         this.buildMode = !this.buildMode;
         this.push("buildToggle", { enabled: this.buildMode, piece: this.buildPiece });
       }
-      if (event.code === "KeyZ") this.selectBuild("wall");
-      if (event.code === "KeyX") this.selectBuild("ramp");
-      if (event.code === "KeyC") this.selectBuild("floor");
-      if (event.code === "KeyV") this.selectBuild("roof");
-      if (event.code === "Space") this.push("dropFromBus");
-      if (event.code === "KeyE") this.push("interact");
-      if (event.code === "KeyG") this.push("useItem");
-      if (event.code === "KeyR") {
+      if (this.matches(event.code, "buildWall")) this.selectBuild("wall");
+      if (this.matches(event.code, "buildRamp")) this.selectBuild("ramp");
+      if (this.matches(event.code, "buildFloor")) this.selectBuild("floor");
+      if (this.matches(event.code, "buildRoof")) this.selectBuild("roof");
+      if (this.matches(event.code, "interact")) this.push("interact");
+      if (this.matches(event.code, "useItem")) this.push("useItem");
+      if (this.matches(event.code, "reloadRotate")) {
         if (this.buildMode) {
           this.buildRotation = (this.buildRotation + 90) % 360;
           this.push("buildRotate", { rotation: this.buildRotation });
@@ -103,6 +105,18 @@ export class InputController extends EventTarget {
     this.dispatchEvent(new CustomEvent("action", { detail: { type, ...payload } }));
   }
 
+  getBind(action) {
+    return this.settings.values.keybinds?.[action];
+  }
+
+  matches(code, action) {
+    return code === this.getBind(action);
+  }
+
+  pressed(action) {
+    return this.keys.has(this.getBind(action));
+  }
+
   consumeActions() {
     const actions = this.actions;
     this.actions = [];
@@ -110,15 +124,15 @@ export class InputController extends EventTarget {
   }
 
   getPacket() {
-    const forward = (this.keys.has("KeyW") ? 1 : 0) - (this.keys.has("KeyS") ? 1 : 0);
-    const strafe = (this.keys.has("KeyD") ? 1 : 0) - (this.keys.has("KeyA") ? 1 : 0);
+    const forward = (this.pressed("moveForward") ? 1 : 0) - (this.pressed("moveBackward") ? 1 : 0);
+    const strafe = (this.pressed("moveRight") ? 1 : 0) - (this.pressed("moveLeft") ? 1 : 0);
     return {
       seq: this.seq++,
       moveX: strafe,
       moveZ: forward,
-      jump: this.keys.has("Space"),
-      sprint: this.keys.has("ShiftLeft") || this.keys.has("ShiftRight"),
-      crouch: this.keys.has("ControlLeft") || this.keys.has("ControlRight"),
+      jump: this.pressed("jump"),
+      sprint: this.pressed("sprint"),
+      crouch: this.pressed("crouch"),
       yaw: this.yaw,
       pitch: this.pitch
     };
