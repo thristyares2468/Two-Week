@@ -3,10 +3,10 @@ const {
   createWeaponInstance,
   distance2D,
   makeId,
-  randomFloat,
-  randomPointInCircle
+  randomFloat
 } = require("./utils");
 const { addInventoryItem } = require("./playerState");
+const { FIELD_CONTAINERS, FIELD_LOOT_ANCHORS, LOOT_ZONES } = require("./mapData");
 
 const LOOT_TABLE = [
   { type: "weapon", weaponId: "assault", weight: 15 },
@@ -20,30 +20,6 @@ const LOOT_TABLE = [
   { type: "shield", amount: 25, itemId: "smallShield", weight: 8 },
   { type: "heal", amount: 35, itemId: "bandage", weight: 8 },
   { type: "heal", amount: 70, itemId: "medkit", weight: 4 }
-];
-
-const NAMED_LOOT_POINTS = [
-  { name: "Rusty Depot", x: -54, z: -42, chest: 3, ammoBoxes: 3 },
-  { name: "Neon Farm", x: 52, z: -54, chest: 3, ammoBoxes: 4 },
-  { name: "Signal Hill", x: -82, z: 50, chest: 2, ammoBoxes: 2 },
-  { name: "Broken Bridge", x: 74, z: 38, chest: 2, ammoBoxes: 3 },
-  { name: "Solar Yard", x: 8, z: -84, chest: 3, ammoBoxes: 3 },
-  { name: "Old Radio Town", x: -8, z: 10, chest: 5, ammoBoxes: 5 },
-  { name: "Quarry Camp", x: 90, z: -12, chest: 3, ammoBoxes: 4 },
-  { name: "Stormwatch Tower", x: -22, z: 82, chest: 2, ammoBoxes: 2 },
-  { name: "Timber Flats", x: 44, z: 78, chest: 2, ammoBoxes: 3 },
-  { name: "Blue Barns", x: -92, z: -10, chest: 3, ammoBoxes: 4 }
-];
-
-const FIELD_CONTAINER_POINTS = [
-  { x: -118, z: -76, type: "chest" },
-  { x: -118, z: 74, type: "ammoBox" },
-  { x: 118, z: -72, type: "ammoBox" },
-  { x: 114, z: 78, type: "chest" },
-  { x: -36, z: -118, type: "chest" },
-  { x: 40, z: 118, type: "ammoBox" },
-  { x: 0, z: 52, type: "chest" },
-  { x: 64, z: -4, type: "ammoBox" }
 ];
 
 function weightedLoot() {
@@ -64,12 +40,13 @@ function createLootItem(template, position, source = "ground") {
     y: 0.4,
     z: Number(position.z.toFixed(2)),
     source,
+    rotation: Number((position.rotation || randomFloat(0, Math.PI * 2)).toFixed(4)),
     createdAt: Date.now()
   };
-  if (template.type === "chest" || template.type === "ammoBox") {
-    item.name = template.type === "chest" ? "Chest" : "Ammo Box";
+  if (template.type === "chest" || template.type === "ammoBox" || template.type === "supplyCrate") {
+    item.name = template.type === "chest" ? "Chest" : template.type === "ammoBox" ? "Ammo Box" : "Supply Crate";
     item.container = true;
-    item.y = template.type === "chest" ? 0.8 : 0.55;
+    item.y = template.type === "chest" ? 0.8 : template.type === "supplyCrate" ? 1.05 : 0.55;
   }
   if (template.type === "weapon") {
     item.weaponId = template.weaponId;
@@ -95,43 +72,39 @@ function createLootItem(template, position, source = "ground") {
 
 function spawnLoot(room) {
   room.loot.clear();
-  for (const point of NAMED_LOOT_POINTS) {
-    const count = room.roomType === "sandbox" ? 2 : 5;
-    for (let i = 0; i < count; i += 1) {
-      const pos = {
-        x: point.x + randomFloat(-14, 14),
-        z: point.z + randomFloat(-14, 14)
-      };
-      const item = createLootItem(weightedLoot(), pos, point.name);
+  const sandboxScale = room.roomType === "sandbox" ? 0.45 : 1;
+  for (const zone of LOOT_ZONES) {
+    const floorCount = Math.max(2, Math.ceil(zone.floorLoot.length * sandboxScale));
+    for (let i = 0; i < floorCount; i += 1) {
+      const anchor = zone.floorLoot[i];
+      const item = createLootItem(weightedLoot(), jitterAnchor(anchor, 1.35), zone.name);
       room.loot.set(item.id, item);
     }
-    const containerScale = room.roomType === "sandbox" ? 0.5 : 1;
-    for (let i = 0; i < Math.ceil(point.chest * containerScale); i += 1) {
-      const pos = {
-        x: point.x + randomFloat(-18, 18),
-        z: point.z + randomFloat(-18, 18)
-      };
-      const item = createLootItem({ type: "chest" }, pos, point.name);
+    for (const anchor of zone.chests.slice(0, Math.ceil(zone.chests.length * sandboxScale))) {
+      const item = createLootItem({ type: "chest" }, jitterAnchor(anchor, 0.75), zone.name);
       room.loot.set(item.id, item);
     }
-    for (let i = 0; i < Math.ceil(point.ammoBoxes * containerScale); i += 1) {
-      const pos = {
-        x: point.x + randomFloat(-20, 20),
-        z: point.z + randomFloat(-20, 20)
-      };
-      const item = createLootItem({ type: "ammoBox" }, pos, point.name);
+    for (const anchor of zone.ammoBoxes.slice(0, Math.ceil(zone.ammoBoxes.length * sandboxScale))) {
+      const item = createLootItem({ type: "ammoBox" }, jitterAnchor(anchor, 0.75), zone.name);
       room.loot.set(item.id, item);
     }
   }
-  for (let i = 0; i < 34; i += 1) {
-    const pos = randomPointInCircle(108);
-    const item = createLootItem(weightedLoot(), pos, "field");
+  for (const anchor of FIELD_LOOT_ANCHORS) {
+    const item = createLootItem(weightedLoot(), jitterAnchor(anchor, 2.6), "field");
     room.loot.set(item.id, item);
   }
-  for (const point of FIELD_CONTAINER_POINTS) {
-    const item = createLootItem({ type: point.type }, point, "field");
+  for (const point of FIELD_CONTAINERS) {
+    const item = createLootItem({ type: point.type }, jitterAnchor(point, 0.8), point.source || "field");
     room.loot.set(item.id, item);
   }
+}
+
+function jitterAnchor(anchor, amount) {
+  return {
+    x: anchor.x + randomFloat(-amount, amount),
+    z: anchor.z + randomFloat(-amount, amount),
+    rotation: randomFloat(0, Math.PI * 2)
+  };
 }
 
 function serializeLoot(room) {
@@ -146,6 +119,8 @@ function pickupLoot(room, player, lootId) {
 
   if (item.type === "chest") {
     grantChestReward(player);
+  } else if (item.type === "supplyCrate") {
+    grantSupplyCrateReward(player);
   } else if (item.type === "ammoBox") {
     grantAmmoBoxReward(player);
   } else if (item.type === "weapon") {
@@ -197,6 +172,25 @@ function grantAmmoBoxReward(player) {
   player.ammo.heavy = (player.ammo.heavy || 0) + 2 + Math.floor(Math.random() * 4);
 }
 
+function grantSupplyCrateReward(player) {
+  const weaponChoices = ["assault", "shotgun", "sniper"];
+  const grantShield = Math.random() > 0.5;
+  addInventoryItem(player, createWeaponInstance(weaponChoices[Math.floor(Math.random() * weaponChoices.length)]));
+  addInventoryItem(player, {
+    slotType: "consumable",
+    instanceId: makeId("item"),
+    itemId: grantShield ? "smallShield" : "medkit",
+    kind: grantShield ? "shield" : "heal",
+    amount: 70,
+    name: grantShield ? "Big Shield" : "Medkit"
+  });
+  player.materials += 80;
+  player.ammo.light = (player.ammo.light || 0) + 48;
+  player.ammo.medium = (player.ammo.medium || 0) + 72;
+  player.ammo.shells = (player.ammo.shells || 0) + 12;
+  player.ammo.heavy = (player.ammo.heavy || 0) + 8;
+}
+
 function useConsumable(player) {
   const item = player.inventory[player.selectedSlot];
   if (!item || item.slotType !== "consumable") return { ok: false, reason: "No consumable selected." };
@@ -216,8 +210,8 @@ function useConsumable(player) {
 }
 
 module.exports = {
-  FIELD_CONTAINER_POINTS,
-  NAMED_LOOT_POINTS,
+  FIELD_CONTAINERS,
+  LOOT_ZONES,
   pickupLoot,
   serializeLoot,
   spawnLoot,

@@ -1,4 +1,5 @@
 const { MAP_SIZE, PLAYER_RADIUS, clamp, distance2D } = require("./utils");
+const { STATIC_COLLIDERS, terrainHeightAt } = require("./mapData");
 
 const BUILD_DIMS = {
   wall: { x: 6, y: 5, z: 0.75 },
@@ -29,6 +30,22 @@ function getBuildBounds(piece) {
       x: piece.x + dims.x / 2,
       y: yCenter + dims.y / 2,
       z: piece.z + dims.z / 2
+    }
+  };
+}
+
+function getStaticBounds(collider) {
+  const yCenter = (collider.y || 0) + collider.height / 2;
+  return {
+    min: {
+      x: collider.x - collider.width / 2,
+      y: yCenter - collider.height / 2,
+      z: collider.z - collider.depth / 2
+    },
+    max: {
+      x: collider.x + collider.width / 2,
+      y: yCenter + collider.height / 2,
+      z: collider.z + collider.depth / 2
     }
   };
 }
@@ -90,6 +107,14 @@ function clampToArena(player) {
   player.z = clamp(player.z, -half, half);
 }
 
+function collidesWithStaticWorld(pos, radius = PLAYER_RADIUS) {
+  const center = { x: pos.x, y: (pos.y || 0) + 1.5, z: pos.z };
+  for (const collider of STATIC_COLLIDERS) {
+    if (sphereAabb(center, radius, getStaticBounds(collider))) return true;
+  }
+  return false;
+}
+
 function collidesWithBuilds(pos, room, radius = PLAYER_RADIUS) {
   const center = { x: pos.x, y: (pos.y || 0) + 1.5, z: pos.z };
   for (const piece of room.builds.values()) {
@@ -120,6 +145,30 @@ function resolvePlayerBuildCollision(player, room) {
   clampToArena(player);
 }
 
+function resolvePlayerStaticCollision(player) {
+  for (let pass = 0; pass < 3; pass += 1) {
+    for (const collider of STATIC_COLLIDERS) {
+      const bounds = getStaticBounds(collider);
+      const center = { x: player.x, y: player.y + 1.45, z: player.z };
+      if (!sphereAabb(center, PLAYER_RADIUS, bounds)) continue;
+      const midX = (bounds.min.x + bounds.max.x) / 2;
+      const midZ = (bounds.min.z + bounds.max.z) / 2;
+      const pushX = center.x < midX
+        ? bounds.min.x - center.x - PLAYER_RADIUS
+        : bounds.max.x - center.x + PLAYER_RADIUS;
+      const pushZ = center.z < midZ
+        ? bounds.min.z - center.z - PLAYER_RADIUS
+        : bounds.max.z - center.z + PLAYER_RADIUS;
+      if (Math.abs(pushX) < Math.abs(pushZ)) {
+        player.x += pushX;
+      } else {
+        player.z += pushZ;
+      }
+    }
+  }
+  clampToArena(player);
+}
+
 function buildOverlapsPlayer(piece, room) {
   const bounds = getBuildBounds(piece);
   for (const player of room.players.values()) {
@@ -128,6 +177,20 @@ function buildOverlapsPlayer(piece, room) {
     if (sphereAabb(center, PLAYER_RADIUS, bounds)) return true;
   }
   return false;
+}
+
+function buildOverlapsStaticWorld(piece) {
+  const bounds = getBuildBounds(piece);
+  for (const collider of STATIC_COLLIDERS) {
+    if (aabbIntersects(bounds, getStaticBounds(collider))) return true;
+  }
+  return false;
+}
+
+function aabbIntersects(a, b) {
+  return a.min.x <= b.max.x && a.max.x >= b.min.x
+    && a.min.y <= b.max.y && a.max.y >= b.min.y
+    && a.min.z <= b.max.z && a.max.z >= b.min.z;
 }
 
 function isInsideArena(pos, padding = 0) {
@@ -147,6 +210,16 @@ function getClosestBuildHit(room, origin, dir, maxDistance) {
   return closest;
 }
 
+function getClosestStaticHit(origin, dir, maxDistance) {
+  let closest = null;
+  for (const collider of STATIC_COLLIDERS) {
+    const distance = rayAabb(origin, dir, getStaticBounds(collider), maxDistance);
+    if (distance === null) continue;
+    if (!closest || distance < closest.distance) closest = { collider, distance };
+  }
+  return closest;
+}
+
 function getNearestInteractable(room, pos, maxDistance) {
   let closest = null;
   for (const loot of room.loot.values()) {
@@ -161,15 +234,21 @@ function getNearestInteractable(room, pos, maxDistance) {
 module.exports = {
   BUILD_DIMS,
   buildOverlapsPlayer,
+  buildOverlapsStaticWorld,
   clampToArena,
   collidesWithBuilds,
+  collidesWithStaticWorld,
+  getClosestStaticHit,
   getBuildBounds,
   getBuildDimensions,
   getClosestBuildHit,
   getNearestInteractable,
+  getStaticBounds,
+  terrainHeightAt,
   isInsideArena,
   rayAabb,
   raySphere,
   resolvePlayerBuildCollision,
+  resolvePlayerStaticCollision,
   sphereAabb
 };

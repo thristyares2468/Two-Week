@@ -5,7 +5,7 @@ const {
   safeNumber,
   clamp
 } = require("./utils");
-const { buildOverlapsPlayer, collidesWithBuilds, isInsideArena } = require("./collision");
+const { buildOverlapsPlayer, buildOverlapsStaticWorld, collidesWithBuilds, isInsideArena } = require("./collision");
 
 const BUILD_COST = 10;
 const BUILD_GRID = 6;
@@ -44,6 +44,7 @@ function validateBuildPlacement(room, player, payload) {
   if (room.buildIndex.has(buildKey(piece))) return { ok: false, reason: "Build space is occupied." };
   const testPiece = { ...piece, id: "test" };
   if (buildOverlapsPlayer(testPiece, room)) return { ok: false, reason: "Cannot build through a player." };
+  if (buildOverlapsStaticWorld(testPiece)) return { ok: false, reason: "Cannot build through a map structure." };
   if (collidesWithBuilds({ x: piece.x, y: piece.y, z: piece.z }, room, 0.5)) {
     return { ok: false, reason: "Build overlaps another piece." };
   }

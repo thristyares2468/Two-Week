@@ -3,16 +3,18 @@ import { getAmmoLabel, getWeaponLabel, WEAPON_STATS } from "./weapons.js";
 
 const MAP_SIZE = 320;
 const MAP_POIS = [
-  { name: "Rusty Depot", x: -54, z: -42 },
-  { name: "Neon Farm", x: 52, z: -54 },
-  { name: "Signal Hill", x: -82, z: 50 },
-  { name: "Broken Bridge", x: 74, z: 38 },
-  { name: "Solar Yard", x: 8, z: -84 },
+  { name: "Rusty Depot", x: -62, z: -46 },
+  { name: "Neon Farm", x: 55, z: -55 },
+  { name: "Signal Hill", x: -86, z: 55 },
+  { name: "Broken Bridge", x: 76, z: 38 },
+  { name: "Solar Yard", x: 8, z: -86 },
   { name: "Old Radio Town", x: -8, z: 10 },
-  { name: "Quarry Camp", x: 90, z: -12 },
-  { name: "Stormwatch Tower", x: -22, z: 82 },
-  { name: "Timber Flats", x: 44, z: 78 },
-  { name: "Blue Barns", x: -92, z: -10 }
+  { name: "Quarry Camp", x: 92, z: -14 },
+  { name: "Stormwatch Tower", x: -24, z: 83 },
+  { name: "Timber Flats", x: 45, z: 78 },
+  { name: "Blue Barns", x: -95, z: -10 },
+  { name: "Tidewalk Pier", x: 112, z: 90 },
+  { name: "Misty Works", x: -118, z: 86 }
 ];
 
 export class UIManager {
@@ -455,11 +457,19 @@ function drawMap(canvas, snapshot, options = {}) {
     const p = toMap(item);
     const isChest = item.type === "chest";
     const isAmmoBox = item.type === "ammoBox";
-    ctx.fillStyle = isChest ? "#f59e0b" : isAmmoBox ? "#22c55e" : "#f8fafc";
+    const isSupply = item.type === "supplyCrate";
+    ctx.fillStyle = isChest ? "#f59e0b" : isAmmoBox ? "#22c55e" : isSupply ? "#38bdf8" : "#f8fafc";
     if (isChest) {
       ctx.fillRect(p.x - (compact ? 2 : 4), p.y - (compact ? 2 : 4), compact ? 4 : 8, compact ? 4 : 8);
     } else if (isAmmoBox) {
       ctx.fillRect(p.x - (compact ? 2 : 4), p.y - (compact ? 1 : 3), compact ? 4 : 8, compact ? 2 : 6);
+    } else if (isSupply) {
+      ctx.beginPath();
+      ctx.rect(p.x - (compact ? 3 : 6), p.y - (compact ? 3 : 6), compact ? 6 : 12, compact ? 6 : 12);
+      ctx.fill();
+      ctx.strokeStyle = "#e0f2fe";
+      ctx.lineWidth = compact ? 1 : 2;
+      ctx.stroke();
     } else {
       ctx.beginPath();
       ctx.arc(p.x, p.y, compact ? 0.9 : 2.4, 0, Math.PI * 2);

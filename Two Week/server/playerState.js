@@ -10,7 +10,7 @@ const {
   sanitizeName,
   WEAPON_STATS
 } = require("./utils");
-const { clampToArena, resolvePlayerBuildCollision } = require("./collision");
+const { clampToArena, resolvePlayerBuildCollision, resolvePlayerStaticCollision, terrainHeightAt } = require("./collision");
 
 const PLAYER_COLORS = [
   "#2dd4bf",
@@ -193,8 +193,9 @@ function applyInput(player, room, dt) {
   player.y += player.vy * dt;
   player.z += player.vz * dt;
 
-  if (player.y <= 0) {
-    player.y = 0;
+  const groundY = terrainHeightAt(player.x, player.z);
+  if (player.y <= groundY) {
+    player.y = groundY;
     player.vy = 0;
     player.grounded = true;
   }
@@ -202,6 +203,7 @@ function applyInput(player, room, dt) {
   const half = MAP_SIZE / 2 - 2;
   player.x = clamp(player.x, -half, half);
   player.z = clamp(player.z, -half, half);
+  resolvePlayerStaticCollision(player);
   resolvePlayerBuildCollision(player, room);
   clampToArena(player);
 }
