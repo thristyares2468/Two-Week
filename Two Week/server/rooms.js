@@ -257,23 +257,6 @@ function serializeSnapshot(room, viewerId = null) {
   };
 }
 
-function dropPlayerFromBus(room, player) {
-  const state = room && room.dropState;
-  if (!state || state.phase !== "bus" || !player || !player.alive || player.hasDropped) return false;
-  const bus = state.bus || state.path.from;
-  player.hasDropped = true;
-  player.onBus = false;
-  player.canFight = true;
-  player.x = bus.x;
-  player.y = Math.max(22, bus.y - 7);
-  player.z = bus.z;
-  player.vx = Math.sin(player.yaw || 0) * 3;
-  player.vy = -3.5;
-  player.vz = Math.cos(player.yaw || 0) * 3;
-  player.grounded = false;
-  return true;
-}
-
 function updateDropState(room) {
   const state = room.dropState;
   if (!state || state.phase === "active") return "active";
@@ -281,13 +264,6 @@ function updateDropState(room) {
   if (state.phase === "spawnIsland" && elapsed >= state.spawnIslandSeconds) {
     state.phase = "bus";
     state.busStartedAt = now();
-    const busRiders = room.roomType === "bot" ? [...room.players.values(), ...room.dummies] : [...room.players.values()];
-    for (const player of busRiders) {
-      if (!player.alive) continue;
-      player.hasDropped = false;
-      player.onBus = true;
-      player.canFight = false;
-    }
   }
   if (state.phase === "bus") {
     const busElapsed = (now() - state.busStartedAt) / 1000;
@@ -301,13 +277,6 @@ function updateDropState(room) {
     const busRiders = room.roomType === "bot" ? [...room.players.values(), ...room.dummies] : [...room.players.values()];
     for (const player of busRiders) {
       if (!player.alive) continue;
-      if (player.hasDropped) {
-        player.onBus = false;
-        player.canFight = true;
-        continue;
-      }
-      player.onBus = true;
-      player.canFight = false;
       player.x = state.bus.x + (offset % 4 - 1.5) * 1.4;
       player.y = state.bus.y - 4;
       player.z = state.bus.z - Math.floor(offset / 4) * 1.6;
@@ -325,16 +294,11 @@ function updateDropState(room) {
       for (const player of contestants) {
         if (!player.alive) continue;
         const spawn = makeSpawn(index, count);
-        if (!player.hasDropped) {
-          player.x = spawn.x;
-          player.y = spawn.y;
-          player.z = spawn.z;
-          player.vy = -5;
-          player.yaw = spawn.yaw;
-        }
-        player.hasDropped = true;
-        player.onBus = false;
-        player.canFight = true;
+        player.x = spawn.x;
+        player.y = 30;
+        player.z = spawn.z;
+        player.vy = -5;
+        player.yaw = spawn.yaw;
         player.grounded = false;
         index += 1;
       }
@@ -369,7 +333,6 @@ function makeSpawnIslandSpawn(index, count) {
 }
 
 module.exports = {
-  dropPlayerFromBus,
   RoomManager,
   serializeRoom,
   serializeSnapshot,

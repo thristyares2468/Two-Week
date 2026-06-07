@@ -1,6 +1,5 @@
 import { escapeHtml, formatSeconds } from "./utils.js";
 import { getAmmoLabel, getWeaponLabel, WEAPON_STATS } from "./weapons.js";
-import { DEFAULT_KEYBINDS } from "./settings.js";
 
 const MAP_SIZE = 320;
 const MAP_POIS = [
@@ -14,45 +13,6 @@ const MAP_POIS = [
   { name: "Stormwatch Tower", x: -22, z: 82 },
   { name: "Timber Flats", x: 44, z: 78 },
   { name: "Blue Barns", x: -92, z: -10 }
-];
-
-const KEYBIND_GROUPS = [
-  {
-    title: "Movement",
-    items: [
-      ["moveForward", "Move Forward"],
-      ["moveBackward", "Move Back"],
-      ["moveLeft", "Move Left"],
-      ["moveRight", "Move Right"],
-      ["jump", "Jump"],
-      ["sprint", "Sprint"],
-      ["crouch", "Crouch"]
-    ]
-  },
-  {
-    title: "Combat And Loot",
-    items: [
-      ["interact", "Interact / Pick Up"],
-      ["reloadRotate", "Reload / Rotate Build"],
-      ["useItem", "Use Item"],
-      ["toggleMap", "Open Map"],
-      ["slot1", "Slot 1"],
-      ["slot2", "Slot 2"],
-      ["slot3", "Slot 3"],
-      ["slot4", "Slot 4"],
-      ["slot5", "Slot 5"]
-    ]
-  },
-  {
-    title: "Building",
-    items: [
-      ["buildMode", "Toggle Build Mode"],
-      ["buildWall", "Wall"],
-      ["buildRamp", "Ramp"],
-      ["buildFloor", "Floor"],
-      ["buildRoof", "Roof"]
-    ]
-  }
 ];
 
 export class UIManager {
@@ -384,17 +344,9 @@ export class UIManager {
       <select id="setting-graphicsQuality">
         ${["Low", "Medium", "High"].map((q) => `<option ${q === s.graphicsQuality ? "selected" : ""}>${q}</option>`).join("")}
       </select>
-      <h3>Keybinds</h3>
-      <p class="settings-note">Click a bind, then press a new key. If that key is already used, the two binds swap.</p>
-      <div class="keybind-panel">
-        ${renderKeybindGroups(s.keybinds || DEFAULT_KEYBINDS)}
-      </div>
       <div class="thin-row" style="margin-top:12px">
         <button id="fullscreenBtn">Fullscreen</button>
-        <button id="resetKeybindsBtn">Reset Binds</button>
-      </div>
-      <div class="thin-row" style="margin-top:8px">
-        <button id="resetSettingsBtn">Reset All Settings</button>
+        <button id="resetSettingsBtn">Reset Keybinds</button>
       </div>
     `;
     this.elements.modal.classList.remove("hidden");
@@ -411,14 +363,7 @@ export class UIManager {
     document.getElementById("setting-graphicsQuality").addEventListener("change", (event) => {
       this.settings.set("graphicsQuality", event.target.value);
     });
-    for (const button of this.elements.modalContent.querySelectorAll("[data-bind-action]")) {
-      button.addEventListener("click", () => this.captureKeybind(button.dataset.bindAction, button));
-    }
     document.getElementById("fullscreenBtn").addEventListener("click", () => document.documentElement.requestFullscreen?.());
-    document.getElementById("resetKeybindsBtn").addEventListener("click", () => {
-      this.settings.resetKeybinds();
-      this.openSettings();
-    });
     document.getElementById("resetSettingsBtn").addEventListener("click", () => {
       this.settings.reset();
       this.openSettings();
@@ -429,39 +374,15 @@ export class UIManager {
     this.openSettings();
   }
 
-  captureKeybind(action, button) {
-    if (!DEFAULT_KEYBINDS[action]) return;
-    const previousText = button.textContent;
-    button.textContent = "Press a key";
-    button.classList.add("listening");
-    const onKeyDown = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      button.classList.remove("listening");
-      if (event.code === "Escape") {
-        button.textContent = previousText;
-        return;
-      }
-      if (!isBindableCode(event.code)) {
-        button.textContent = previousText;
-        this.toast("That key cannot be used as a bind.");
-        return;
-      }
-      this.settings.setKeybind(action, event.code);
-      this.openSettings();
-    };
-    window.addEventListener("keydown", onKeyDown, { capture: true, once: true });
-  }
-
   openHowToPlay() {
     this.elements.modalContent.innerHTML = `
       <h2>How to Play</h2>
       <ul>
-        <li>Move with WASD, sprint with Shift, jump with Space, and look with the mouse. Keyboard binds can be changed in Settings.</li>
-        <li>Left click shoots. Press R to reload and 1-5 to switch inventory slots by default.</li>
-        <li>Press E near glowing loot to pick it up. Press G to use a selected healing or shield item by default.</li>
-        <li>Press M to open the island map and check storm, players, floor loot, chests, and ammo boxes by default.</li>
-        <li>Press Q for build mode. Z, X, C, and V choose wall, ramp, floor, and roof by default. Left click places the preview.</li>
+        <li>Move with WASD, sprint with Shift, jump with Space, and look with the mouse.</li>
+        <li>Left click shoots. Press R to reload and 1-5 to switch inventory slots.</li>
+        <li>Press E near glowing loot to pick it up. Press G to use a selected healing or shield item.</li>
+        <li>Press M to open the island map and check storm, players, floor loot, chests, and ammo boxes.</li>
+        <li>Press Q for build mode. Z, X, C, and V choose wall, ramp, floor, and roof. Left click places the preview.</li>
         <li>The match opens on Spawn Island, then the battle bus carries players across the main island before the drop.</li>
         <li>Stay inside the storm circle. The last surviving player wins.</li>
         <li>Online multiplayer uses the hosted Node server. Local tabs are only a development test method.</li>
@@ -632,55 +553,4 @@ function checkbox(key, label, value) {
       <input id="setting-${key}" type="checkbox" ${value ? "checked" : ""}>
     </label>
   `;
-}
-
-function renderKeybindGroups(keybinds) {
-  return KEYBIND_GROUPS.map((group) => `
-    <section class="keybind-group">
-      <h4>${group.title}</h4>
-      ${group.items.map(([action, label]) => `
-        <div class="keybind-row">
-          <span>${label}</span>
-          <button type="button" class="keybind-button" data-bind-action="${action}">${keyLabel(keybinds[action] || DEFAULT_KEYBINDS[action])}</button>
-        </div>
-      `).join("")}
-    </section>
-  `).join("");
-}
-
-function isBindableCode(code) {
-  if (!code) return false;
-  if (["Escape", "MetaLeft", "MetaRight", "AltLeft", "AltRight"].includes(code)) return false;
-  return /^(Key|Digit|Numpad|Arrow|Shift|Control|Space|Tab|Backquote|Minus|Equal|Bracket|Backslash|Semicolon|Quote|Comma|Period|Slash)/.test(code);
-}
-
-function keyLabel(code) {
-  const labels = {
-    Space: "Space",
-    ShiftLeft: "Left Shift",
-    ShiftRight: "Right Shift",
-    ControlLeft: "Left Ctrl",
-    ControlRight: "Right Ctrl",
-    Tab: "Tab",
-    Backquote: "`",
-    Minus: "-",
-    Equal: "=",
-    BracketLeft: "[",
-    BracketRight: "]",
-    Backslash: "\\",
-    Semicolon: ";",
-    Quote: "'",
-    Comma: ",",
-    Period: ".",
-    Slash: "/",
-    ArrowUp: "Up",
-    ArrowDown: "Down",
-    ArrowLeft: "Left",
-    ArrowRight: "Right"
-  };
-  if (labels[code]) return labels[code];
-  if (code.startsWith("Key")) return code.slice(3);
-  if (code.startsWith("Digit")) return code.slice(5);
-  if (code.startsWith("Numpad")) return `Numpad ${code.slice(6)}`;
-  return code || "Unbound";
 }

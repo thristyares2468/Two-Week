@@ -1,4 +1,4 @@
-const { WEAPON_STATS, PLAYER_HEIGHT, PLAYER_RADIUS, clamp, normalizeAngle, randomFloat } = require("./utils");
+const { WEAPON_STATS, clamp, normalizeAngle, randomFloat } = require("./utils");
 const { applyDamage, getHeldWeapon } = require("./playerState");
 const { damageBuild } = require("./buildingServer");
 const { getClosestBuildHit, raySphere } = require("./collision");
@@ -22,8 +22,8 @@ function findPlayerHit(room, shooter, origin, dir, maxDistance, blockedDistance)
   const candidates = [...room.players.values(), ...room.dummies];
   for (const target of candidates) {
     if (!target.alive || target.id === shooter.id) continue;
-    const radius = target.isBot ? PLAYER_RADIUS * 1.15 : PLAYER_RADIUS;
-    const center = { x: target.x, y: target.y + PLAYER_HEIGHT * 0.54, z: target.z };
+    const radius = target.isBot ? 1.35 : 1.25;
+    const center = { x: target.x, y: target.y + 1.55, z: target.z };
     const t = raySphere(origin, dir, center, radius, maxDistance);
     if (t === null) continue;
     if (blockedDistance !== null && t > blockedDistance) continue;
@@ -59,7 +59,7 @@ function fireHitscan(room, player, payload = {}) {
 
   const origin = {
     x: player.x + Math.sin(yaw) * 0.9,
-    y: player.y + PLAYER_HEIGHT * 0.58,
+    y: player.y + 1.65,
     z: player.z + Math.cos(yaw) * 0.9
   };
   const pellets = stats.pellets || 1;

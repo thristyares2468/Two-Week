@@ -10,7 +10,7 @@ const {
   sanitizeName,
   WEAPON_STATS
 } = require("./utils");
-const { clampToArena, resolvePlayerBuildCollision, resolvePlayerStaticCollision, terrainHeightAt } = require("./collision");
+const { clampToArena, resolvePlayerBuildCollision } = require("./collision");
 
 const PLAYER_COLORS = [
   "#2dd4bf",
@@ -47,9 +47,6 @@ function createPlayer(socketId, name, index = 0, options = {}) {
     alive: true,
     spectator: false,
     isBot: Boolean(options.isBot),
-    onBus: false,
-    hasDropped: false,
-    canFight: false,
     health: 100,
     shield: options.isBot ? 0 : 50,
     materials: options.materials || 80,
@@ -75,8 +72,7 @@ function createPlayer(socketId, name, index = 0, options = {}) {
 
 function resetPlayerForMatch(player, spawn, mode) {
   player.x = spawn.x;
-  const groundY = terrainHeightAt(spawn.x, spawn.z);
-  player.y = Math.max(spawn.y || 0, groundY);
+  player.y = spawn.y || 0;
   player.z = spawn.z;
   player.vx = 0;
   player.vy = 0;
@@ -86,9 +82,6 @@ function resetPlayerForMatch(player, spawn, mode) {
   player.grounded = player.y <= 0.01;
   player.alive = true;
   player.spectator = false;
-  player.onBus = false;
-  player.hasDropped = mode === "practice" || mode === "sandbox";
-  player.canFight = mode === "practice" || mode === "sandbox";
   player.health = 100;
   player.shield = player.isBot ? 0 : 50;
   player.materials = mode === "sandbox" ? 9999 : mode === "practice" ? 400 : 90;
@@ -124,9 +117,6 @@ function serializePlayer(player) {
     alive: player.alive,
     spectator: player.spectator,
     isBot: player.isBot,
-    onBus: Boolean(player.onBus),
-    canFight: Boolean(player.canFight),
-    heldWeaponId: getHeldItem(player) && getHeldItem(player).slotType === "weapon" ? getHeldItem(player).weaponId : null,
     selectedSlot: player.selectedSlot,
     materials: player.materials,
     eliminations: player.eliminations
@@ -194,9 +184,8 @@ function applyInput(player, room, dt) {
   player.y += player.vy * dt;
   player.z += player.vz * dt;
 
-  const groundY = terrainHeightAt(player.x, player.z);
-  if (player.y <= groundY) {
-    player.y = groundY;
+  if (player.y <= 0) {
+    player.y = 0;
     player.vy = 0;
     player.grounded = true;
   }
@@ -204,7 +193,6 @@ function applyInput(player, room, dt) {
   const half = MAP_SIZE / 2 - 2;
   player.x = clamp(player.x, -half, half);
   player.z = clamp(player.z, -half, half);
-  resolvePlayerStaticCollision(player);
   resolvePlayerBuildCollision(player, room);
   clampToArena(player);
 }
@@ -311,12 +299,10 @@ function countAliveContestants(room) {
 function makeSpawn(index, count) {
   const angle = (index / Math.max(1, count)) * Math.PI * 2;
   const radius = 42 + (index % 4) * 10;
-  const x = Math.cos(angle) * radius;
-  const z = Math.sin(angle) * radius;
   return {
-    x,
-    y: terrainHeightAt(x, z) + 24,
-    z,
+    x: Math.cos(angle) * radius,
+    y: 24,
+    z: Math.sin(angle) * radius,
     yaw: angle + Math.PI
   };
 }
@@ -331,7 +317,7 @@ function makePracticeDummies(count = 5) {
     });
     resetPlayerForMatch(dummy, {
       x: Math.cos(angle) * 28,
-      y: terrainHeightAt(Math.cos(angle) * 28, Math.sin(angle) * 28),
+      y: 0,
       z: Math.sin(angle) * 28,
       yaw: angle + Math.PI
     }, "practice");

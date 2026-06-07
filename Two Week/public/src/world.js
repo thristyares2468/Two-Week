@@ -217,41 +217,19 @@ export class World {
       if (!res.ok) return;
       const loader = new GLTFLoader();
       loader.load("/assets/models/map.glb", (gltf) => {
-        const map = gltf.scene;
-        map.name = "ProvidedMapModel";
-        map.updateMatrixWorld(true);
-        const box = new THREE.Box3().setFromObject(map);
-        const size = box.getSize(new THREE.Vector3());
-        const horizontalSize = Math.max(size.x, size.z, 1);
-        const targetSize = 292;
-        const uniformScale = targetSize / horizontalSize;
-        map.scale.multiplyScalar(uniformScale);
-        map.updateMatrixWorld(true);
-
-        const scaledBox = new THREE.Box3().setFromObject(map);
-        const center = scaledBox.getCenter(new THREE.Vector3());
-        map.position.x -= center.x;
-        map.position.z -= center.z;
-        map.position.y -= scaledBox.min.y - 0.03;
-
-        map.traverse((child) => {
+        gltf.scene.rotation.x = -Math.PI / 2;
+        gltf.scene.scale.set(155, 155, 8);
+        gltf.scene.position.set(0, 0.15, 0);
+        gltf.scene.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
-            if (!child.material) {
-              child.material = new THREE.MeshStandardMaterial({ color: "#6fbf85", roughness: 0.92 });
-            } else if (Array.isArray(child.material)) {
-              child.material = child.material.map((material) => prepareMapMaterial(material));
-            } else {
-              child.material = prepareMapMaterial(child.material);
-            }
           }
         });
-        this.root.add(map);
+        gltf.scene.name = "ProvidedMapModel";
+        this.root.add(gltf.scene);
         this.fallbackRoot.visible = false;
         this.modelLoaded = true;
-      }, undefined, () => {
-        this.modelLoaded = false;
       });
     } catch (_error) {
       this.modelLoaded = false;
@@ -270,14 +248,4 @@ export class World {
       this.bus.rotation.y = 0;
     }
   }
-}
-
-function prepareMapMaterial(material) {
-  const prepared = material.clone();
-  prepared.side = THREE.DoubleSide;
-  prepared.roughness = Math.max(0.72, prepared.roughness ?? 0.82);
-  if (prepared.color && prepared.color.getHex() === 0xffffff && !prepared.map) {
-    prepared.color.set("#77b987");
-  }
-  return prepared;
 }

@@ -145,10 +145,6 @@ export class NetworkClient extends EventTarget {
       this.emitLocal("error", "Online multiplayer requires the Node server to be running.");
       return;
     }
-    if (!this.connected) {
-      this.emitLocal("error", "Still connecting to the game server. Try again in a moment.");
-      return;
-    }
     this.socket.emit(event, payload);
   }
 }

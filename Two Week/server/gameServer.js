@@ -32,13 +32,6 @@ function attachGameServer(io) {
     }
   }
 
-  function emitImmediateSnapshots(room) {
-    if (!room) return;
-    for (const playerId of room.players.keys()) {
-      io.to(playerId).emit("world:snapshot", serializeSnapshot(room, playerId));
-    }
-  }
-
   function joinSocketToRoom(socket, room, name) {
     leaveCurrentRoom(socket);
     const result = rooms.addPlayer(room, socket.id, name);
@@ -50,9 +43,6 @@ function attachGameServer(io) {
     socketRooms.set(socket.id, room.roomCode);
     socket.emit("connection:state", { connected: true, id: socket.id, roomCode: room.roomCode });
     emitRoomState(room);
-    if (room.status === "playing" || room.status === "finished") {
-      emitImmediateSnapshots(room);
-    }
     return result;
   }
 
@@ -253,8 +243,6 @@ function attachGameServer(io) {
       if (room.status === "countdown" && room.countdownEndsAt <= now()) {
         rooms.startMatch(room);
         io.to(room.roomCode).emit("match:start", serializeRoom(room));
-        emitRoomState(room);
-        emitImmediateSnapshots(room);
       }
       if (room.status === "playing") {
         updateStorm(room.storm);
