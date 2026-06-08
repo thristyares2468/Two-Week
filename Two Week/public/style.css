@@ -226,16 +226,30 @@ select {
   text-transform: uppercase;
 }
 
-.nav-tabs span {
+.nav-tab {
   position: relative;
-  padding: 21px 0;
+  min-height: 62px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: rgba(248, 250, 252, 0.7);
+  background: transparent;
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: inherit;
 }
 
-.nav-tabs .active {
+.nav-tab:hover {
+  transform: none;
+  color: var(--ink);
+  background: transparent;
+}
+
+.nav-tab.active {
   color: var(--sun);
 }
 
-.nav-tabs .active::after {
+.nav-tab.active::after {
   content: "";
   position: absolute;
   left: 0;
@@ -479,6 +493,113 @@ select {
 .lobby-side {
   align-self: start;
   padding-top: 24px;
+}
+
+.lobby-tab-panel {
+  position: absolute;
+  inset: 86px 22px 22px;
+  overflow: auto;
+}
+
+.tab-shell {
+  min-height: 100%;
+  display: grid;
+  gap: 20px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 24px;
+  background: rgba(5, 13, 28, 0.78);
+  box-shadow: var(--shadow);
+}
+
+.tab-shell h2 {
+  margin: 0;
+  font-size: clamp(36px, 7vw, 82px);
+  line-height: 0.95;
+}
+
+.tab-shell p {
+  max-width: 520px;
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.map-tab-shell {
+  grid-template-columns: minmax(240px, 0.55fr) minmax(360px, 1fr);
+}
+
+.lobby-map-card {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+#lobbyMapCanvas {
+  width: min(68vh, 720px);
+  max-width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0e7490;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
+}
+
+.locker-tab {
+  grid-template-columns: minmax(260px, 0.75fr) minmax(280px, 1fr);
+}
+
+.locker-preview {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+}
+
+.locker-figure {
+  position: relative;
+  width: 180px;
+  height: 320px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #2dd4bf, #0f766e);
+  box-shadow: 0 28px 80px rgba(45, 212, 191, 0.22);
+}
+
+.locker-figure span {
+  position: absolute;
+  left: 54px;
+  top: -38px;
+  width: 72px;
+  height: 78px;
+  border-radius: 22px;
+  background: #f6c08d;
+}
+
+.locker-figure b {
+  position: absolute;
+  left: 48px;
+  bottom: -56px;
+  width: 84px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(45, 212, 191, 0.35);
+}
+
+.locker-swatches {
+  display: flex;
+  gap: 10px;
+}
+
+.locker-swatches button {
+  width: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+}
+
+.stats-tab {
+  grid-template-columns: minmax(260px, 0.7fr) minmax(300px, 1fr);
 }
 
 .news-card {

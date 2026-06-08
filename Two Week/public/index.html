@@ -36,12 +36,12 @@
       <section id="menuScreen" class="screen screen-panel menu-screen">
         <nav class="lobby-nav" aria-label="Lobby navigation">
           <div class="nav-brand">Two Weeks</div>
-          <div class="nav-tabs">
-            <span class="active">Lobby</span>
-            <span>Locker</span>
-            <span>Map</span>
-            <span>Stats</span>
-            <span>Settings</span>
+          <div class="nav-tabs" role="tablist" aria-label="Lobby sections">
+            <button class="nav-tab active" data-lobby-tab="lobby" type="button">Lobby</button>
+            <button class="nav-tab" data-lobby-tab="locker" type="button">Locker</button>
+            <button class="nav-tab" data-lobby-tab="map" type="button">Map</button>
+            <button class="nav-tab" data-lobby-tab="stats" type="button">Stats</button>
+            <button class="nav-tab" data-lobby-tab="settings" type="button">Settings</button>
           </div>
           <div id="connectionStatus" class="status-pill">Connecting...</div>
         </nav>
@@ -112,6 +112,7 @@
             </div>
           </aside>
         </div>
+        <section id="lobbyTabPanel" class="lobby-tab-panel hidden" aria-live="polite"></section>
       </section>
 
       <section id="roomScreen" class="screen screen-panel hidden">

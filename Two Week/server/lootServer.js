@@ -23,16 +23,19 @@ const LOOT_TABLE = [
 ];
 
 const NAMED_LOOT_POINTS = [
-  { name: "Rusty Depot", x: -54, z: -42, chest: 3, ammoBoxes: 3 },
-  { name: "Neon Farm", x: 52, z: -54, chest: 3, ammoBoxes: 4 },
-  { name: "Signal Hill", x: -82, z: 50, chest: 2, ammoBoxes: 2 },
-  { name: "Broken Bridge", x: 74, z: 38, chest: 2, ammoBoxes: 3 },
-  { name: "Solar Yard", x: 8, z: -84, chest: 3, ammoBoxes: 3 },
-  { name: "Old Radio Town", x: -8, z: 10, chest: 5, ammoBoxes: 5 },
-  { name: "Quarry Camp", x: 90, z: -12, chest: 3, ammoBoxes: 4 },
-  { name: "Stormwatch Tower", x: -22, z: 82, chest: 2, ammoBoxes: 2 },
-  { name: "Timber Flats", x: 44, z: 78, chest: 2, ammoBoxes: 3 },
-  { name: "Blue Barns", x: -92, z: -10, chest: 3, ammoBoxes: 4 }
+  { name: "Craggy Cliffs", x: 8, z: -122, chest: 3, ammoBoxes: 3 },
+  { name: "Pleasant Park", x: -52, z: -84, chest: 4, ammoBoxes: 4 },
+  { name: "Steamy Stacks", x: 82, z: -88, chest: 4, ammoBoxes: 4 },
+  { name: "Sweaty Sands", x: -104, z: -52, chest: 3, ammoBoxes: 4 },
+  { name: "Frenzy Farm", x: 18, z: -42, chest: 5, ammoBoxes: 5 },
+  { name: "Dirty Docks", x: 106, z: -20, chest: 4, ammoBoxes: 5 },
+  { name: "Salty Springs", x: -34, z: -12, chest: 3, ammoBoxes: 3 },
+  { name: "Holly Hedges", x: -88, z: 18, chest: 3, ammoBoxes: 3 },
+  { name: "Weeping Woods", x: -42, z: 38, chest: 4, ammoBoxes: 4 },
+  { name: "Retail Row", x: 86, z: 38, chest: 4, ammoBoxes: 4 },
+  { name: "Lazy Lake", x: 48, z: 54, chest: 4, ammoBoxes: 4 },
+  { name: "Slurpy Swamp", x: -66, z: 88, chest: 4, ammoBoxes: 4 },
+  { name: "Misty Meadows", x: 28, z: 110, chest: 4, ammoBoxes: 4 }
 ];
 
 const FIELD_CONTAINER_POINTS = [

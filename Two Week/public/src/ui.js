@@ -4,16 +4,19 @@ import { DEFAULT_KEYBINDS } from "./settings.js";
 
 const MAP_SIZE = 320;
 const MAP_POIS = [
-  { name: "Rusty Depot", x: -54, z: -42 },
-  { name: "Neon Farm", x: 52, z: -54 },
-  { name: "Signal Hill", x: -82, z: 50 },
-  { name: "Broken Bridge", x: 74, z: 38 },
-  { name: "Solar Yard", x: 8, z: -84 },
-  { name: "Old Radio Town", x: -8, z: 10 },
-  { name: "Quarry Camp", x: 90, z: -12 },
-  { name: "Stormwatch Tower", x: -22, z: 82 },
-  { name: "Timber Flats", x: 44, z: 78 },
-  { name: "Blue Barns", x: -92, z: -10 }
+  { name: "Craggy Cliffs", x: 8, z: -122 },
+  { name: "Pleasant Park", x: -52, z: -84 },
+  { name: "Steamy Stacks", x: 82, z: -88 },
+  { name: "Sweaty Sands", x: -104, z: -52 },
+  { name: "Frenzy Farm", x: 18, z: -42 },
+  { name: "Dirty Docks", x: 106, z: -20 },
+  { name: "Salty Springs", x: -34, z: -12 },
+  { name: "Holly Hedges", x: -88, z: 18 },
+  { name: "Weeping Woods", x: -42, z: 38 },
+  { name: "Retail Row", x: 86, z: 38 },
+  { name: "Lazy Lake", x: 48, z: 54 },
+  { name: "Slurpy Swamp", x: -66, z: 88 },
+  { name: "Misty Meadows", x: 28, z: 110 }
 ];
 
 const KEYBIND_GROUPS = [
@@ -82,6 +85,9 @@ export class UIManager {
       mapOverlay: byId("mapOverlay"),
       modalContent: byId("modalContent"),
       toastLayer: byId("toastLayer"),
+      lobbyLayout: document.querySelector(".lobby-layout"),
+      lobbyTabPanel: byId("lobbyTabPanel"),
+      navTabs: Array.from(document.querySelectorAll("[data-lobby-tab]")),
       displayName: byId("displayName"),
       roomCodeInput: byId("roomCodeInput"),
       quickMatch: byId("quickMatchBtn"),
@@ -134,6 +140,9 @@ export class UIManager {
         handler();
       });
     };
+    for (const tab of this.elements.navTabs) {
+      click(tab, () => this.openLobbyTab(tab.dataset.lobbyTab));
+    }
     click(this.elements.quickMatch, () => this.startWithName("quick"));
     click(this.elements.createPrivate, () => this.startWithName("private"));
     click(this.elements.joinRoom, () => this.startWithName("join"));
@@ -155,6 +164,54 @@ export class UIManager {
 
   on(callbacks) {
     this.callbacks = { ...this.callbacks, ...callbacks };
+  }
+
+  openLobbyTab(tab) {
+    if (!tab) return;
+    for (const button of this.elements.navTabs) {
+      const active = button.dataset.lobbyTab === tab;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    }
+    if (tab === "settings") {
+      this.elements.lobbyLayout.classList.remove("hidden");
+      this.elements.lobbyTabPanel.classList.add("hidden");
+      this.openSettings();
+      return;
+    }
+    if (tab === "lobby") {
+      this.elements.lobbyLayout.classList.remove("hidden");
+      this.elements.lobbyTabPanel.classList.add("hidden");
+      return;
+    }
+    this.elements.lobbyLayout.classList.add("hidden");
+    this.elements.lobbyTabPanel.classList.remove("hidden");
+    if (tab === "locker") this.renderLockerTab();
+    if (tab === "map") this.renderLobbyMapTab();
+    if (tab === "stats") this.renderStatsTab();
+  }
+
+  renderLockerTab() {
+    this.elements.lobbyTabPanel.innerHTML = '<div class="tab-shell locker-tab"><div><div class="brand-kicker">Locker</div><h2>Runner Loadout</h2><p>Choose a clean original runner style before jumping into the island.</p></div><div class="locker-preview"><div class="locker-figure" aria-hidden="true"><span></span><b></b></div><div class="locker-swatches"><button style="--swatch:#2dd4bf" aria-label="Teal runner"></button><button style="--swatch:#facc15" aria-label="Yellow runner"></button><button style="--swatch:#fb7185" aria-label="Rose runner"></button><button style="--swatch:#60a5fa" aria-label="Blue runner"></button></div></div></div>';
+  }
+
+  renderLobbyMapTab() {
+    this.elements.lobbyTabPanel.innerHTML = '<div class="tab-shell map-tab-shell"><div class="map-tab-copy"><div class="brand-kicker">Island Map</div><h2>Drop Planner</h2><p>Named areas, loot sources, and storm rings appear here before and during matches.</p></div><div class="lobby-map-card"><canvas id="lobbyMapCanvas" width="900" height="900"></canvas><div class="map-legend"><span><b class="legend-player"></b> You</span><span><b class="legend-enemy"></b> Players</span><span><b class="legend-loot"></b> Floor loot</span><span><b class="legend-chest"></b> Chests</span><span><b class="legend-ammo"></b> Ammo boxes</span><span><b class="legend-storm"></b> Safe zone</span></div></div></div>';
+    const canvas = document.getElementById("lobbyMapCanvas");
+    drawMap(canvas, this.snapshot || makeLobbyMapSnapshot(), { compact: false, showLabels: true });
+  }
+
+  renderStatsTab() {
+    const self = this.snapshot && this.snapshot.self;
+    const stats = [
+      ["Eliminations", self ? self.eliminations : 0],
+      ["Damage Dealt", self ? self.damageDealt : 0],
+      ["Damage Taken", self ? self.damageTaken : 0],
+      ["Builds Placed", self ? self.buildsPlaced : 0],
+      ["Accuracy", self && self.shotsFired ? String(Math.round((self.shotsHit / self.shotsFired) * 100)) + "%" : "--"],
+      ["Current Room", this.room ? this.room.roomCode : "None"]
+    ];
+    this.elements.lobbyTabPanel.innerHTML = '<div class="tab-shell stats-tab"><div><div class="brand-kicker">Stats</div><h2>Match Snapshot</h2><p>Live stats update once you enter a match.</p></div><div class="result-stats">' + stats.map(([label, value]) => '<div class="stat"><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(String(value)) + '</strong></div>').join("") + '</div></div>';
   }
 
   startWithName(mode) {
@@ -310,7 +367,7 @@ export class UIManager {
 
   renderFullMap(snapshot = this.snapshot) {
     if (!snapshot) return;
-    drawMap(this.elements.fullMap, snapshot, { compact: false });
+    drawMap(this.elements.fullMap, snapshot, { compact: false, showLabels: true });
   }
 
   toggleMap(snapshot = this.snapshot) {
@@ -491,12 +548,7 @@ function drawMap(canvas, snapshot, options = {}) {
   });
 
   ctx.clearRect(0, 0, w, h);
-  const gradient = ctx.createLinearGradient(0, 0, w, h);
-  gradient.addColorStop(0, "#123c2e");
-  gradient.addColorStop(0.48, "#1d5a3a");
-  gradient.addColorStop(1, "#0e7490");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, w, h);
+  drawIslandBase(ctx, w, h, centerX, centerY, usable, compact);
 
   ctx.save();
   ctx.translate(centerX, centerY);
@@ -515,7 +567,7 @@ function drawMap(canvas, snapshot, options = {}) {
   drawMapRoad(ctx, toMap({ x: -120, z: 0 }), toMap({ x: 120, z: 0 }), compact);
   drawMapRoad(ctx, toMap({ x: -90, z: -80 }), toMap({ x: 90, z: 70 }), compact);
 
-  if (!compact) {
+  if (!compact || options.showLabels) {
     for (const poi of MAP_POIS) {
       const p = toMap(poi);
       ctx.fillStyle = "rgba(250, 204, 21, 0.9)";
@@ -587,6 +639,68 @@ function drawMap(canvas, snapshot, options = {}) {
     ctx.textAlign = "left";
     ctx.fillText(`Storm: ${snapshot.storm ? `${snapshot.storm.mode} ${formatSeconds(snapshot.storm.secondsRemaining)}` : "waiting"} | Loot: ${loot.length} | Players: ${snapshot.playersRemaining}`, 38, h - 35);
   }
+}
+
+function drawIslandBase(ctx, w, h, centerX, centerY, usable, compact) {
+  const water = ctx.createLinearGradient(0, 0, w, h);
+  water.addColorStop(0, "#0ea5c7");
+  water.addColorStop(0.55, "#087d9c");
+  water.addColorStop(1, "#064e70");
+  ctx.fillStyle = water;
+  ctx.fillRect(0, 0, w, h);
+
+  const points = [[-0.06, -0.49], [0.15, -0.46], [0.32, -0.37], [0.47, -0.18], [0.43, 0.08], [0.36, 0.27], [0.16, 0.47], [-0.05, 0.45], [-0.25, 0.37], [-0.43, 0.18], [-0.48, -0.05], [-0.38, -0.27], [-0.22, -0.42]];
+  ctx.save();
+  ctx.beginPath();
+  points.forEach(([x, y], index) => {
+    const px = centerX + x * usable;
+    const py = centerY + y * usable;
+    if (index === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
+  ctx.fillStyle = "#2f9a4f";
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = compact ? 8 : 22;
+  ctx.fill();
+  ctx.clip();
+
+  const land = ctx.createRadialGradient(centerX, centerY, usable * 0.05, centerX, centerY, usable * 0.56);
+  land.addColorStop(0, "#9fcf50");
+  land.addColorStop(0.36, "#5fb64d");
+  land.addColorStop(0.72, "#2f8f55");
+  land.addColorStop(1, "#216f50");
+  ctx.fillStyle = land;
+  ctx.fillRect(centerX - usable / 2, centerY - usable / 2, usable, usable);
+
+  ctx.strokeStyle = "rgba(99, 179, 237, 0.8)";
+  ctx.lineWidth = compact ? 2 : 6;
+  ctx.beginPath();
+  ctx.moveTo(centerX - usable * 0.24, centerY - usable * 0.38);
+  ctx.bezierCurveTo(centerX - usable * 0.04, centerY - usable * 0.18, centerX - usable * 0.18, centerY + usable * 0.08, centerX + usable * 0.1, centerY + usable * 0.28);
+  ctx.bezierCurveTo(centerX + usable * 0.2, centerY + usable * 0.34, centerX + usable * 0.1, centerY + usable * 0.42, centerX + usable * 0.02, centerY + usable * 0.48);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(232, 240, 255, 0.9)";
+  ctx.beginPath();
+  ctx.ellipse(centerX + usable * 0.26, centerY + usable * 0.33, usable * 0.08, usable * 0.055, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function makeLobbyMapSnapshot() {
+  return {
+    loot: [],
+    players: [],
+    playersRemaining: 0,
+    self: null,
+    storm: {
+      mode: "waiting",
+      secondsRemaining: 0,
+      current: { x: 0, z: 0, radius: 128 },
+      target: { x: 16, z: -12, radius: 82 }
+    }
+  };
 }
 
 function drawMapRoad(ctx, from, to, compact) {
