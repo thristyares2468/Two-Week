@@ -7,11 +7,19 @@ const { attachGameServer } = require("./server/gameServer");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: false
-  },
-  pingInterval: 10000,
-  pingTimeout: 8000
+  transports: ["polling", "websocket"],
+  allowUpgrades: true,
+  pingInterval: 25000,
+  pingTimeout: 20000,
+  maxHttpBufferSize: 1e6
+});
+
+io.engine.on("connection_error", (error) => {
+  console.error("Socket.IO connection error", {
+    code: error.code,
+    message: error.message,
+    context: error.context
+  });
 });
 
 const publicPath = path.join(__dirname, "public");

@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { lerp, makeTextSprite, normalizeAngle } from "./utils.js";
 
+const PLAYER_VISUAL_SCALE = 0.62;
+
 export class PlayerRenderer {
   constructor(scene) {
     this.scene = scene;
@@ -45,6 +47,9 @@ export class PlayerRenderer {
   createPlayer(state) {
     const group = new THREE.Group();
     group.position.set(state.x || 0, state.y || 0, state.z || 0);
+    const model = new THREE.Group();
+    model.scale.setScalar(PLAYER_VISUAL_SCALE);
+    group.add(model);
 
     const bodyMat = new THREE.MeshStandardMaterial({
       color: state.color || "#2dd4bf",
@@ -55,48 +60,48 @@ export class PlayerRenderer {
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.78, 1.65, 4, 8), bodyMat);
     body.position.y = 1.55;
     body.castShadow = true;
-    group.add(body);
+    model.add(body);
 
     const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.66, 0), bodyMat);
     head.position.y = 2.85;
     head.castShadow = true;
-    group.add(head);
+    model.add(head);
 
     const visor = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.2, 0.12), darkMat);
     visor.position.set(0, 2.92, 0.58);
-    group.add(visor);
+    model.add(visor);
 
     const pack = new THREE.Mesh(new THREE.BoxGeometry(0.82, 1, 0.28), darkMat);
     pack.position.set(0, 1.65, -0.72);
-    group.add(pack);
+    model.add(pack);
 
     const label = makeTextSprite(THREE, state.name || "Runner", {
       width: 220,
       height: 54,
       size: 20,
-      worldWidth: 4.2,
-      worldHeight: 1
+      worldWidth: 3.1,
+      worldHeight: 0.74
     });
-    label.position.y = 4.25;
+    label.position.y = 2.9;
     group.add(label);
 
     const bar = new THREE.Group();
-    bar.position.y = 3.72;
+    bar.position.y = 2.52;
     const bg = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.8, 0.22),
+      new THREE.PlaneGeometry(2.15, 0.18),
       new THREE.MeshBasicMaterial({ color: "#020617", transparent: true, opacity: 0.72 })
     );
     const healthFill = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.65, 0.14),
+      new THREE.PlaneGeometry(2.03, 0.11),
       new THREE.MeshBasicMaterial({ color: "#60a5fa" })
     );
     healthFill.position.z = 0.01;
-    healthFill.position.x = -1.325;
-    healthFill.geometry.translate(1.325, 0, 0);
+    healthFill.position.x = -1.015;
+    healthFill.geometry.translate(1.015, 0, 0);
     bar.add(bg, healthFill);
     group.add(bar);
 
-    return { group, body, label, bar, healthFill };
+    return { group, model, body, label, bar, healthFill };
   }
 
   getPosition(id) {

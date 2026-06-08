@@ -1,7 +1,15 @@
 export class NetworkClient extends EventTarget {
   constructor() {
     super();
-    this.socket = typeof io === "function" ? io() : null;
+    this.socket = typeof io === "function" ? io({
+      transports: ["polling", "websocket"],
+      upgrade: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
+    }) : null;
     this.connected = false;
     this.id = null;
     this.lastPing = 0;
@@ -30,8 +38,24 @@ export class NetworkClient extends EventTarget {
       this.emitLocal("connection", { connected: false, reason });
     });
 
+    this.socket.on("connect_error", (error) => {
+      this.connected = false;
+      this.emitLocal("connection", {
+        connected: false,
+        reason: `Connection error: ${error.message || "server unavailable"}`
+      });
+    });
+
     this.socket.io.on("reconnect_attempt", () => {
       this.emitLocal("connection", { connected: false, reconnecting: true });
+    });
+
+    this.socket.io.on("reconnect_error", (error) => {
+      this.emitLocal("connection", {
+        connected: false,
+        reconnecting: true,
+        reason: `Reconnecting: ${error.message || "transport unavailable"}`
+      });
     });
 
     this.forward("connection:state", "connection");
@@ -143,6 +167,10 @@ export class NetworkClient extends EventTarget {
   send(event, payload) {
     if (!this.socket) {
       this.emitLocal("error", "Online multiplayer requires the Node server to be running.");
+      return;
+    }
+    if (!this.connected) {
+      this.emitLocal("error", "Still connecting to the game server. Try again in a moment.");
       return;
     }
     this.socket.emit(event, payload);

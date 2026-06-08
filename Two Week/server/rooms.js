@@ -277,13 +277,20 @@ function updateDropState(room) {
     const busRiders = room.roomType === "bot" ? [...room.players.values(), ...room.dummies] : [...room.players.values()];
     for (const player of busRiders) {
       if (!player.alive) continue;
-      player.x = state.bus.x + (offset % 4 - 1.5) * 1.4;
-      player.y = state.bus.y - 4;
-      player.z = state.bus.z - Math.floor(offset / 4) * 1.6;
-      player.vx = 0;
-      player.vy = 0;
-      player.vz = 0;
-      player.grounded = false;
+      const seatX = (offset % 4 - 1.5) * 1.4;
+      const seatZ = -Math.floor(offset / 4) * 1.6;
+      if (!player.droppedFromBus && !player.isBot && player.input && player.input.jump) {
+        releaseFromBus(player, state.bus, seatX, seatZ);
+      }
+      if (!player.droppedFromBus) {
+        player.x = state.bus.x + seatX;
+        player.y = state.bus.y - 4;
+        player.z = state.bus.z + seatZ;
+        player.vx = 0;
+        player.vy = 0;
+        player.vz = 0;
+        player.grounded = false;
+      }
       offset += 1;
     }
     if (t >= 1) {
@@ -292,7 +299,7 @@ function updateDropState(room) {
       const contestants = room.roomType === "bot" ? [...room.players.values(), ...room.dummies] : [...room.players.values()];
       const count = contestants.length;
       for (const player of contestants) {
-        if (!player.alive) continue;
+        if (!player.alive || player.droppedFromBus) continue;
         const spawn = makeSpawn(index, count);
         player.x = spawn.x;
         player.y = 30;
@@ -305,6 +312,17 @@ function updateDropState(room) {
     }
   }
   return state.phase;
+}
+
+function releaseFromBus(player, bus, xOffset, zOffset) {
+  player.droppedFromBus = true;
+  player.x = bus.x + xOffset;
+  player.y = bus.y - 8;
+  player.z = bus.z + zOffset;
+  player.vx = 0;
+  player.vy = -7;
+  player.vz = 0;
+  player.grounded = false;
 }
 
 function serializeDropState(dropState) {

@@ -1,4 +1,4 @@
-const { MAP_SIZE, PLAYER_RADIUS, clamp, distance2D } = require("./utils");
+const { MAP_SIZE, PLAYER_HEIGHT, PLAYER_RADIUS, clamp, distance2D } = require("./utils");
 
 const BUILD_DIMS = {
   wall: { x: 6, y: 5, z: 0.75 },
@@ -84,6 +84,14 @@ function raySphere(origin, dir, center, radius, maxDistance) {
   return t2 >= 0 && t2 <= maxDistance ? t2 : null;
 }
 
+function playerCollisionCenter(pos) {
+  return {
+    x: pos.x,
+    y: (pos.y || 0) + PLAYER_HEIGHT * 0.5,
+    z: pos.z
+  };
+}
+
 function clampToArena(player) {
   const half = MAP_SIZE / 2 - PLAYER_RADIUS;
   player.x = clamp(player.x, -half, half);
@@ -91,7 +99,7 @@ function clampToArena(player) {
 }
 
 function collidesWithBuilds(pos, room, radius = PLAYER_RADIUS) {
-  const center = { x: pos.x, y: (pos.y || 0) + 1.5, z: pos.z };
+  const center = playerCollisionCenter(pos);
   for (const piece of room.builds.values()) {
     if (sphereAabb(center, radius, getBuildBounds(piece))) return true;
   }
@@ -102,7 +110,7 @@ function resolvePlayerBuildCollision(player, room) {
   for (let pass = 0; pass < 2; pass += 1) {
     for (const piece of room.builds.values()) {
       const bounds = getBuildBounds(piece);
-      const center = { x: player.x, y: player.y + 1.45, z: player.z };
+      const center = playerCollisionCenter(player);
       if (!sphereAabb(center, PLAYER_RADIUS, bounds)) continue;
       const pushX = center.x < (bounds.min.x + bounds.max.x) / 2
         ? bounds.min.x - center.x - PLAYER_RADIUS
@@ -124,7 +132,7 @@ function buildOverlapsPlayer(piece, room) {
   const bounds = getBuildBounds(piece);
   for (const player of room.players.values()) {
     if (!player.alive) continue;
-    const center = { x: player.x, y: player.y + 1.45, z: player.z };
+    const center = playerCollisionCenter(player);
     if (sphereAabb(center, PLAYER_RADIUS, bounds)) return true;
   }
   return false;
@@ -167,6 +175,7 @@ module.exports = {
   getBuildDimensions,
   getClosestBuildHit,
   getNearestInteractable,
+  playerCollisionCenter,
   isInsideArena,
   rayAabb,
   raySphere,

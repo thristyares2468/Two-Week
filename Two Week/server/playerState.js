@@ -56,6 +56,7 @@ function createPlayer(socketId, name, index = 0, options = {}) {
     reloadEndsAt: 0,
     lastFireAt: 0,
     input: null,
+    droppedFromBus: false,
     eliminations: 0,
     damageDealt: 0,
     damageTaken: 0,
@@ -90,6 +91,7 @@ function resetPlayerForMatch(player, spawn, mode) {
   player.selectedSlot = 0;
   player.reloadEndsAt = 0;
   player.lastFireAt = 0;
+  player.droppedFromBus = false;
   player.eliminations = 0;
   player.damageDealt = 0;
   player.damageTaken = 0;
