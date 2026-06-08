@@ -2,6 +2,9 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { makeTextSprite } from "./utils.js";
 
+const MAP_MODEL_TARGET_SIZE = 300;
+const MAP_MODEL_URL = new URL("../assets/models/map.glb", import.meta.url).href;
+
 const POIS = [
   { name: "Rusty Depot", x: -54, z: -42, color: "#f97316" },
   { name: "Neon Farm", x: 52, z: -54, color: "#22c55e" },
@@ -212,28 +215,53 @@ export class World {
   }
 
   async tryLoadMapModel() {
-    try {
-      const res = await fetch("/assets/models/map.glb", { method: "HEAD" });
-      if (!res.ok) return;
-      const loader = new GLTFLoader();
-      loader.load("/assets/models/map.glb", (gltf) => {
-        gltf.scene.rotation.x = -Math.PI / 2;
-        gltf.scene.scale.set(155, 155, 8);
-        gltf.scene.position.set(0, 0.15, 0);
-        gltf.scene.traverse((child) => {
+    const loader = new GLTFLoader();
+    loader.load(
+      MAP_MODEL_URL,
+      (gltf) => {
+        const model = gltf.scene;
+        model.name = "ProvidedMapModel";
+        model.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
+            if (child.material) child.material.needsUpdate = true;
           }
         });
-        gltf.scene.name = "ProvidedMapModel";
-        this.root.add(gltf.scene);
+        this.normalizeMapModel(model);
+        this.root.add(model);
         this.fallbackRoot.visible = false;
         this.modelLoaded = true;
-      });
-    } catch (_error) {
-      this.modelLoaded = false;
+      },
+      undefined,
+      (error) => {
+        this.modelLoaded = false;
+        console.warn("Map model failed to load; using generated fallback map.", error);
+      }
+    );
+  }
+
+  normalizeMapModel(model) {
+    model.updateMatrixWorld(true);
+    let box = new THREE.Box3().setFromObject(model);
+    let size = box.getSize(new THREE.Vector3());
+    const shouldRotateToYUp = size.y > Math.max(size.x, size.z) * 1.35;
+    if (shouldRotateToYUp) {
+      model.rotation.x = -Math.PI / 2;
+      model.updateMatrixWorld(true);
+      box = new THREE.Box3().setFromObject(model);
+      size = box.getSize(new THREE.Vector3());
     }
+    const horizontalSize = Math.max(size.x, size.z) || 1;
+    const scale = MAP_MODEL_TARGET_SIZE / horizontalSize;
+    model.scale.multiplyScalar(scale);
+    model.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.x -= center.x;
+    model.position.z -= center.z;
+    model.position.y -= box.min.y;
+    model.position.y += 0.05;
   }
 
   updateDropState(dropState) {

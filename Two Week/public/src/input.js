@@ -80,7 +80,7 @@ export class InputController extends EventTarget {
     document.addEventListener("mousemove", (event) => {
       if (document.pointerLockElement !== this.canvas || this.paused) return;
       const sensitivity = this.settings.values.mouseSensitivity;
-      this.yaw += event.movementX * sensitivity;
+      this.yaw -= event.movementX * sensitivity;
       const invert = this.settings.values.invertY ? -1 : 1;
       this.pitch -= event.movementY * sensitivity * invert;
       this.pitch = clamp(this.pitch, -0.9, 0.55);
@@ -125,7 +125,7 @@ export class InputController extends EventTarget {
 
   getPacket() {
     const forward = (this.pressed("moveForward") ? 1 : 0) - (this.pressed("moveBackward") ? 1 : 0);
-    const strafe = (this.pressed("moveRight") ? 1 : 0) - (this.pressed("moveLeft") ? 1 : 0);
+    const strafe = (this.pressed("moveLeft") ? 1 : 0) - (this.pressed("moveRight") ? 1 : 0);
     return {
       seq: this.seq++,
       moveX: strafe,
