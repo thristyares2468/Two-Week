@@ -7,6 +7,7 @@ const {
   createWeaponInstance,
   distance2D,
   normalizeAngle,
+  getTerrainHeightAt,
   safeNumber,
   sanitizeName,
   WEAPON_STATS
@@ -194,8 +195,9 @@ function applyInput(player, room, dt) {
   player.y += player.vy * dt;
   player.z += player.vz * dt;
 
-  if (player.y <= 0) {
-    player.y = 0;
+  const groundY = getTerrainHeightAt(player.x, player.z);
+  if (player.y <= groundY) {
+    player.y = groundY;
     player.vy = 0;
     player.grounded = true;
   }
@@ -385,11 +387,13 @@ function countAliveContestants(room) {
 
 function makeSpawn(index, count) {
   const angle = (index / Math.max(1, count)) * Math.PI * 2;
-  const radius = 42 + (index % 4) * 10;
+  const radius = 92 + (index % 5) * 22;
+  const x = Math.cos(angle) * radius;
+  const z = Math.sin(angle) * radius;
   return {
-    x: Math.cos(angle) * radius,
-    y: 24,
-    z: Math.sin(angle) * radius,
+    x,
+    y: getTerrainHeightAt(x, z) + 2,
+    z,
     yaw: angle + Math.PI
   };
 }
@@ -403,9 +407,9 @@ function makePracticeDummies(count = 5) {
       materials: 0
     });
     resetPlayerForMatch(dummy, {
-      x: Math.cos(angle) * 28,
-      y: 0,
-      z: Math.sin(angle) * 28,
+      x: Math.cos(angle) * 58,
+      y: getTerrainHeightAt(Math.cos(angle) * 58, Math.sin(angle) * 58) + 0.2,
+      z: Math.sin(angle) * 58,
       yaw: angle + Math.PI
     }, "practice");
     dummy.shield = 0;

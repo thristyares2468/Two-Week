@@ -1,10 +1,10 @@
 const { MAP_SIZE, distance2D, lerp, randomPointInCircle } = require("./utils");
 
 const STORM_PHASES = [
-  { wait: 45, shrink: 35, radius: 92, damage: 1 },
-  { wait: 35, shrink: 30, radius: 58, damage: 2 },
-  { wait: 26, shrink: 24, radius: 28, damage: 4 },
-  { wait: 15, shrink: 20, radius: 10, damage: 7 }
+  { wait: 45, shrink: 35, radius: 170, damage: 1 },
+  { wait: 35, shrink: 30, radius: 105, damage: 2 },
+  { wait: 26, shrink: 24, radius: 52, damage: 4 },
+  { wait: 15, shrink: 20, radius: 18, damage: 7 }
 ];
 
 function createStorm() {

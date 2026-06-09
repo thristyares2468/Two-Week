@@ -1,8 +1,10 @@
 const {
   BOT_LOBBY_BOT_COUNT,
   COUNTDOWN_SECONDS,
+  MAP_SIZE,
   MAX_PLAYERS,
   QUICK_START_PLAYERS,
+  getTerrainHeightAt,
   lerp,
   makeRoomCode,
   now
@@ -132,10 +134,10 @@ class RoomManager {
           startedAt: now(),
           spawnIslandSeconds: 7,
           busSeconds: 14,
-          bus: { x: 0, y: 42, z: -132 },
+          bus: { x: 0, y: 64, z: -MAP_SIZE * 0.42 },
           path: {
-            from: { x: -72, y: 42, z: -132 },
-            to: { x: 72, y: 42, z: 132 }
+            from: { x: -MAP_SIZE * 0.28, y: 64, z: -MAP_SIZE * 0.42 },
+            to: { x: MAP_SIZE * 0.28, y: 64, z: MAP_SIZE * 0.42 }
           }
         };
     spawnLoot(room);
@@ -302,7 +304,7 @@ function updateDropState(room) {
         if (!player.alive || player.droppedFromBus) continue;
         const spawn = makeSpawn(index, count);
         player.x = spawn.x;
-        player.y = 30;
+        player.y = getTerrainHeightAt(spawn.x, spawn.z) + 34;
         player.z = spawn.z;
         player.vy = -5;
         player.yaw = spawn.yaw;
@@ -341,11 +343,11 @@ function serializeDropState(dropState) {
 
 function makeSpawnIslandSpawn(index, count) {
   const angle = (index / Math.max(1, count)) * Math.PI * 2;
-  const radius = 6 + (index % 4) * 2.2;
+  const radius = 9 + (index % 4) * 3;
   return {
     x: Math.cos(angle) * radius,
-    y: 0,
-    z: -150 + Math.sin(angle) * radius,
+    y: 1.5,
+    z: -MAP_SIZE * 0.46 + Math.sin(angle) * radius,
     yaw: 0
   };
 }

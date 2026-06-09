@@ -5,6 +5,7 @@ const {
   createWeaponInstance,
   distance2D,
   makeId,
+  groundLootY,
   randomFloat,
   randomPointInCircle
 } = require("./utils");
@@ -44,6 +45,8 @@ const LOOT_TABLE = [
   { type: "consumable", itemId: "fishingRod", count: 1, weight: 2.2 }
 ];
 
+const LOOT_COORD_SCALE = 1.7;
+
 const NAMED_LOOT_POINTS = [
   { name: "Craggy Cliffs", x: 8, z: -122, chest: 3, ammoBoxes: 3 },
   { name: "Pleasant Park", x: -52, z: -84, chest: 4, ammoBoxes: 4 },
@@ -61,14 +64,14 @@ const NAMED_LOOT_POINTS = [
 ];
 
 const FIELD_CONTAINER_POINTS = [
-  { x: -118, z: -76, type: "chest" },
-  { x: -118, z: 74, type: "ammoBox" },
-  { x: 118, z: -72, type: "ammoBox" },
-  { x: 114, z: 78, type: "chest" },
-  { x: -36, z: -118, type: "chest" },
-  { x: 40, z: 118, type: "ammoBox" },
-  { x: 0, z: 52, type: "chest" },
-  { x: 64, z: -4, type: "ammoBox" }
+  { x: -205, z: -132, type: "chest" },
+  { x: -210, z: 126, type: "ammoBox" },
+  { x: 210, z: -124, type: "ammoBox" },
+  { x: 198, z: 136, type: "chest" },
+  { x: -62, z: -210, type: "chest" },
+  { x: 70, z: 210, type: "ammoBox" },
+  { x: 0, z: 92, type: "chest" },
+  { x: 112, z: -8, type: "ammoBox" }
 ];
 
 function weightedChoice(table) {
@@ -92,7 +95,7 @@ function createLootItem(template, position, source = "ground") {
     id: makeId("loot"),
     type: template.type,
     x: Number(position.x.toFixed(2)),
-    y: 0.4,
+    y: groundLootY(position.x, position.z, 0.9),
     z: Number(position.z.toFixed(2)),
     source,
     createdAt: Date.now()
@@ -100,7 +103,7 @@ function createLootItem(template, position, source = "ground") {
   if (template.type === "chest" || template.type === "ammoBox") {
     item.name = template.type === "chest" ? "Chest" : "Ammo Box";
     item.container = true;
-    item.y = template.type === "chest" ? 0.8 : 0.55;
+    item.y = groundLootY(position.x, position.z, template.type === "chest" ? 1.25 : 0.9);
   } else if (template.type === "weapon") {
     const stats = WEAPON_STATS[template.weaponId] || WEAPON_STATS.pistol_common;
     item.weaponId = stats.id;
@@ -133,11 +136,13 @@ function createLootItem(template, position, source = "ground") {
 function spawnLoot(room) {
   room.loot.clear();
   for (const point of NAMED_LOOT_POINTS) {
+    const baseX = point.x * LOOT_COORD_SCALE;
+    const baseZ = point.z * LOOT_COORD_SCALE;
     const count = room.roomType === "sandbox" ? 3 : 7;
     for (let i = 0; i < count; i += 1) {
       const pos = {
-        x: point.x + randomFloat(-14, 14),
-        z: point.z + randomFloat(-14, 14)
+        x: baseX + randomFloat(-20, 20),
+        z: baseZ + randomFloat(-20, 20)
       };
       const item = createLootItem(weightedLoot(), pos, point.name);
       room.loot.set(item.id, item);
@@ -145,23 +150,23 @@ function spawnLoot(room) {
     const containerScale = room.roomType === "sandbox" ? 0.6 : 1;
     for (let i = 0; i < Math.ceil(point.chest * containerScale); i += 1) {
       const pos = {
-        x: point.x + randomFloat(-18, 18),
-        z: point.z + randomFloat(-18, 18)
+        x: baseX + randomFloat(-26, 26),
+        z: baseZ + randomFloat(-26, 26)
       };
       const item = createLootItem({ type: "chest" }, pos, point.name);
       room.loot.set(item.id, item);
     }
     for (let i = 0; i < Math.ceil(point.ammoBoxes * containerScale); i += 1) {
       const pos = {
-        x: point.x + randomFloat(-20, 20),
-        z: point.z + randomFloat(-20, 20)
+        x: baseX + randomFloat(-30, 30),
+        z: baseZ + randomFloat(-30, 30)
       };
       const item = createLootItem({ type: "ammoBox" }, pos, point.name);
       room.loot.set(item.id, item);
     }
   }
   for (let i = 0; i < 44; i += 1) {
-    const pos = randomPointInCircle(118);
+    const pos = randomPointInCircle(226);
     const item = createLootItem(weightedLoot(), pos, "field");
     room.loot.set(item.id, item);
   }

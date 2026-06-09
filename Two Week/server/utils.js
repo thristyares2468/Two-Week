@@ -1,5 +1,5 @@
 const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const MAP_SIZE = 320;
+const MAP_SIZE = 560;
 const PLAYER_RADIUS = 0.72;
 const PLAYER_HEIGHT = 2.15;
 const SERVER_TICK_RATE = 20;
@@ -341,6 +341,19 @@ function randomPointInCircle(radius, center = { x: 0, z: 0 }) {
   };
 }
 
+function getTerrainHeightAt(x, z) {
+  const nx = x / Math.max(1, MAP_SIZE);
+  const nz = z / Math.max(1, MAP_SIZE);
+  const rolling = Math.sin(nx * 18) * 1.25 + Math.cos(nz * 16) * 1.05 + Math.sin((nx + nz) * 13) * 0.8;
+  const ridge = Math.max(0, Math.sin((x - z) * 0.018)) * 1.15;
+  return Math.max(0, 1.25 + rolling + ridge);
+}
+
+function groundLootY(x, z, baseOffset = 0.9) {
+  return Number((getTerrainHeightAt(x, z) + baseOffset).toFixed(2));
+}
+
+
 function snap(value, size = 6) {
   return Math.round(value / size) * size;
 }
@@ -422,6 +435,8 @@ module.exports = {
   clonePublicItem,
   createConsumableInstance,
   createWeaponInstance,
+  getTerrainHeightAt,
+  groundLootY,
   distance2D,
   distance3D,
   lerp,

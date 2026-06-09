@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { makeTextSprite } from "./utils.js";
 
-const MAP_MODEL_TARGET_SIZE = 300;
+const MAP_MODEL_TARGET_SIZE = 540;
 const MAP_MODEL_URL = new URL("../assets/models/map.glb", import.meta.url).href;
 
 const POIS = [
@@ -51,7 +51,7 @@ export class World {
 
   createFallbackMap() {
     const groundMat = new THREE.MeshStandardMaterial({ color: "#3f8f59", roughness: 0.92 });
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(270, 270, 18, 18), groundMat);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(520, 520, 28, 28), groundMat);
     const pos = ground.geometry.attributes.position;
     for (let i = 0; i < pos.count; i += 1) {
       const x = pos.getX(i);
@@ -65,7 +65,7 @@ export class World {
     this.fallbackRoot.add(ground);
 
     const water = new THREE.Mesh(
-      new THREE.PlaneGeometry(340, 340),
+      new THREE.PlaneGeometry(620, 620),
       new THREE.MeshBasicMaterial({ color: "#0e7490", transparent: true, opacity: 0.42 })
     );
     water.position.y = -2.2;
@@ -77,12 +77,12 @@ export class World {
     for (const poi of POIS) this.addPoi(poi);
     for (let i = 0; i < 70; i += 1) {
       const angle = Math.random() * Math.PI * 2;
-      const radius = 25 + Math.random() * 105;
+      const radius = 35 + Math.random() * 215;
       this.addTree(Math.cos(angle) * radius, Math.sin(angle) * radius);
     }
     for (let i = 0; i < 40; i += 1) {
       const angle = Math.random() * Math.PI * 2;
-      const radius = 20 + Math.random() * 112;
+      const radius = 30 + Math.random() * 220;
       this.addRock(Math.cos(angle) * radius, Math.sin(angle) * radius);
     }
   }
@@ -258,10 +258,25 @@ export class World {
     model.updateMatrixWorld(true);
     box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
+    const finalSize = box.getSize(new THREE.Vector3());
     model.position.x -= center.x;
     model.position.z -= center.z;
-    model.position.y -= box.min.y;
-    model.position.y += 0.05;
+
+    // User-provided island meshes often include ocean depth/underside geometry.
+    // Anchor the upper terrain band to the server ground plane instead of the lowest vertex.
+    const terrainSurfaceY = box.min.y + finalSize.y * 0.72;
+    model.position.y -= terrainSurfaceY;
+    model.position.y += 0.35;
+
+    model.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+          mat.side = THREE.DoubleSide;
+          mat.needsUpdate = true;
+        }
+      }
+    });
   }
 
   updateDropState(dropState) {

@@ -2,7 +2,8 @@ import { escapeHtml, formatSeconds } from "./utils.js";
 import { CONSUMABLE_STATS, getAmmoLabel, getItemColor, getWeaponLabel, WEAPON_STATS } from "./weapons.js";
 import { DEFAULT_KEYBINDS } from "./settings.js";
 
-const MAP_SIZE = 320;
+const MAP_SIZE = 560;
+const MAP_POI_SCALE = 1.7;
 const MAP_POIS = [
   { name: "Craggy Cliffs", x: 8, z: -122 },
   { name: "Pleasant Park", x: -52, z: -84 },
@@ -557,6 +558,10 @@ function drawMap(canvas, snapshot, options = {}) {
     x: centerX + point.x * scale,
     y: centerY + point.z * scale
   });
+  const poiToMap = (point) => ({
+    x: centerX + point.x * MAP_POI_SCALE * scale,
+    y: centerY + point.z * MAP_POI_SCALE * scale
+  });
 
   ctx.clearRect(0, 0, w, h);
   drawIslandBase(ctx, w, h, centerX, centerY, usable, compact);
@@ -564,7 +569,7 @@ function drawMap(canvas, snapshot, options = {}) {
   ctx.save();
   ctx.translate(centerX, centerY);
   ctx.fillStyle = "rgba(15, 23, 42, 0.2)";
-  for (let i = -140; i <= 140; i += 28) {
+  for (let i = -252; i <= 252; i += 42) {
     ctx.fillRect(i * scale - 1, -usable / 2, 2, usable);
     ctx.fillRect(-usable / 2, i * scale - 1, usable, 2);
   }
@@ -574,13 +579,13 @@ function drawMap(canvas, snapshot, options = {}) {
   ctx.lineWidth = compact ? 1 : 2;
   ctx.strokeRect(centerX - usable / 2, centerY - usable / 2, usable, usable);
 
-  drawMapRoad(ctx, toMap({ x: 0, z: -120 }), toMap({ x: 0, z: 120 }), compact);
-  drawMapRoad(ctx, toMap({ x: -120, z: 0 }), toMap({ x: 120, z: 0 }), compact);
-  drawMapRoad(ctx, toMap({ x: -90, z: -80 }), toMap({ x: 90, z: 70 }), compact);
+  drawMapRoad(ctx, toMap({ x: 0, z: -220 }), toMap({ x: 0, z: 220 }), compact);
+  drawMapRoad(ctx, toMap({ x: -220, z: 0 }), toMap({ x: 220, z: 0 }), compact);
+  drawMapRoad(ctx, toMap({ x: -165, z: -145 }), toMap({ x: 165, z: 130 }), compact);
 
   if (!compact || options.showLabels) {
     for (const poi of MAP_POIS) {
-      const p = toMap(poi);
+      const p = poiToMap(poi);
       ctx.fillStyle = "rgba(250, 204, 21, 0.9)";
       ctx.beginPath();
       ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
