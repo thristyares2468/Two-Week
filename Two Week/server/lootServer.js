@@ -45,7 +45,7 @@ const LOOT_TABLE = [
   { type: "consumable", itemId: "fishingRod", count: 1, weight: 2.2 }
 ];
 
-const LOOT_COORD_SCALE = 1.7;
+const LOOT_COORD_SCALE = 4.25;
 
 const NAMED_LOOT_POINTS = [
   { name: "Craggy Cliffs", x: 8, z: -122, chest: 3, ammoBoxes: 3 },
@@ -64,14 +64,14 @@ const NAMED_LOOT_POINTS = [
 ];
 
 const FIELD_CONTAINER_POINTS = [
-  { x: -205, z: -132, type: "chest" },
-  { x: -210, z: 126, type: "ammoBox" },
-  { x: 210, z: -124, type: "ammoBox" },
-  { x: 198, z: 136, type: "chest" },
-  { x: -62, z: -210, type: "chest" },
-  { x: 70, z: 210, type: "ammoBox" },
-  { x: 0, z: 92, type: "chest" },
-  { x: 112, z: -8, type: "ammoBox" }
+  { x: -512, z: -330, type: "chest" },
+  { x: -525, z: 315, type: "ammoBox" },
+  { x: 525, z: -310, type: "ammoBox" },
+  { x: 495, z: 340, type: "chest" },
+  { x: -155, z: -525, type: "chest" },
+  { x: 175, z: 525, type: "ammoBox" },
+  { x: 0, z: 230, type: "chest" },
+  { x: 280, z: -20, type: "ammoBox" }
 ];
 
 function weightedChoice(table) {
@@ -166,7 +166,7 @@ function spawnLoot(room) {
     }
   }
   for (let i = 0; i < 44; i += 1) {
-    const pos = randomPointInCircle(226);
+    const pos = randomPointInCircle(565);
     const item = createLootItem(weightedLoot(), pos, "field");
     room.loot.set(item.id, item);
   }

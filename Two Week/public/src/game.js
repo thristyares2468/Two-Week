@@ -48,8 +48,8 @@ export class TwoWeeksGame {
     this.renderer.shadowMap.enabled = this.settings.values.graphicsQuality !== "Low";
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color("#7dd3fc");
-    this.scene.fog = new THREE.Fog("#bae6fd", 90, 245);
-    this.camera = new THREE.PerspectiveCamera(67, window.innerWidth / window.innerHeight, 0.1, 500);
+    this.scene.fog = new THREE.Fog("#bae6fd", 260, 1120);
+    this.camera = new THREE.PerspectiveCamera(67, window.innerWidth / window.innerHeight, 0.1, 1800);
     this.world = new World(this.scene);
     this.players = new PlayerRenderer(this.scene);
     this.buildings = new BuildingRenderer(this.scene);

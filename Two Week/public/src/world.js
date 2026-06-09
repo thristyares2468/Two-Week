@@ -2,12 +2,41 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { makeTextSprite } from "./utils.js";
 
-const MAP_MODEL_TARGET_SIZE = 540;
+const MAP_MODEL_TARGET_SIZE = 1350;
 const MAP_MODEL_URL = new URL("../assets/models/map.glb", import.meta.url).href;
-const SPAWN_ISLAND_Z = -405;
-const SPAWN_ISLAND_RADIUS = 38;
-const SPAWN_ISLAND_GROUND_Y = 2.85;
+const SPAWN_ISLAND_Z = -980;
+const SPAWN_ISLAND_RADIUS = 24;
+const SPAWN_ISLAND_GROUND_Y = 2.25;
 const MAIN_GROUND_Y = 0.35;
+
+
+const MAP_BUILDING_POIS = [
+  { x: 35, z: -518, count: 5, color: "#94a3b8" },
+  { x: -221, z: -357, count: 8, color: "#d8b4fe" },
+  { x: 349, z: -374, count: 7, color: "#93c5fd" },
+  { x: -442, z: -221, count: 6, color: "#fde68a" },
+  { x: 77, z: -179, count: 9, color: "#facc15" },
+  { x: 451, z: -85, count: 8, color: "#60a5fa" },
+  { x: -145, z: -51, count: 6, color: "#fca5a5" },
+  { x: -374, z: 77, count: 6, color: "#bbf7d0" },
+  { x: -179, z: 162, count: 6, color: "#86efac" },
+  { x: 366, z: 162, count: 8, color: "#f9a8d4" },
+  { x: 204, z: 230, count: 8, color: "#c4b5fd" },
+  { x: -281, z: 383, count: 7, color: "#a7f3d0" },
+  { x: 119, z: 477, count: 8, color: "#fef3c7" }
+];
+
+const MAP_BUILDING_OFFSETS = [
+  { x: -14, z: -10, w: 9, d: 8, h: 7 },
+  { x: 0, z: -12, w: 8, d: 10, h: 8 },
+  { x: 14, z: -7, w: 10, d: 7, h: 6 },
+  { x: -10, z: 5, w: 7, d: 9, h: 9 },
+  { x: 6, z: 4, w: 11, d: 8, h: 7 },
+  { x: 18, z: 10, w: 7, d: 11, h: 10 },
+  { x: -18, z: 15, w: 12, d: 7, h: 6 },
+  { x: 2, z: 18, w: 9, d: 9, h: 8 },
+  { x: 24, z: -18, w: 9, d: 9, h: 13 }
+];
 
 const POIS = [
   { name: "Rusty Depot", x: -54, z: -42, color: "#f97316" },
@@ -27,14 +56,16 @@ export class World {
     this.scene = scene;
     this.root = new THREE.Group();
     this.fallbackRoot = new THREE.Group();
+    this.structureRoot = new THREE.Group();
     this.bus = null;
     this.modelLoaded = false;
     this.mapImage = null;
-    this.heightMap = null;
     this.scene.add(this.root);
     this.root.add(this.fallbackRoot);
+    this.root.add(this.structureRoot);
     this.createLighting();
     this.createFallbackMap();
+    this.createMapBuildings();
     this.createSpawnIsland();
     this.createDropBus();
     this.tryLoadMapModel();
@@ -57,7 +88,7 @@ export class World {
 
   createFallbackMap() {
     const groundMat = new THREE.MeshStandardMaterial({ color: "#3f8f59", roughness: 0.92 });
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(520, 520, 28, 28), groundMat);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1320, 1320, 40, 40), groundMat);
     const pos = ground.geometry.attributes.position;
     for (let i = 0; i < pos.count; i += 1) {
       const x = pos.getX(i);
@@ -71,24 +102,24 @@ export class World {
     this.fallbackRoot.add(ground);
 
     const water = new THREE.Mesh(
-      new THREE.PlaneGeometry(620, 620),
+      new THREE.PlaneGeometry(1540, 1540),
       new THREE.MeshBasicMaterial({ color: "#0e7490", transparent: true, opacity: 0.42 })
     );
     water.position.y = -2.2;
     water.rotation.x = -Math.PI / 2;
     this.fallbackRoot.add(water);
 
-    this.addRoad(0, -90, 0, 90);
-    this.addRoad(-95, 0, 95, 0);
+    this.addRoad(0, -550, 0, 550);
+    this.addRoad(-550, 0, 550, 0);
     for (const poi of POIS) this.addPoi(poi);
     for (let i = 0; i < 70; i += 1) {
       const angle = Math.random() * Math.PI * 2;
-      const radius = 35 + Math.random() * 215;
+      const radius = 80 + Math.random() * 545;
       this.addTree(Math.cos(angle) * radius, Math.sin(angle) * radius);
     }
     for (let i = 0; i < 40; i += 1) {
       const angle = Math.random() * Math.PI * 2;
-      const radius = 30 + Math.random() * 220;
+      const radius = 75 + Math.random() * 555;
       this.addRock(Math.cos(angle) * radius, Math.sin(angle) * radius);
     }
   }
@@ -159,37 +190,92 @@ export class World {
     this.fallbackRoot.add(rock);
   }
 
+  createMapBuildings() {
+    const roofMat = new THREE.MeshStandardMaterial({ color: "#334155", roughness: 0.82 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: "#7dd3fc", roughness: 0.35, metalness: 0.08 });
+    for (const poi of MAP_BUILDING_POIS) {
+      const group = new THREE.Group();
+      group.position.set(poi.x, MAIN_GROUND_Y, poi.z);
+      const wallMat = new THREE.MeshStandardMaterial({ color: poi.color, roughness: 0.88 });
+      for (let i = 0; i < poi.count; i += 1) {
+        const offset = MAP_BUILDING_OFFSETS[i % MAP_BUILDING_OFFSETS.length];
+        const building = new THREE.Group();
+        building.position.set(offset.x, 0, offset.z);
+        building.rotation.y = ((i % 4) * Math.PI) / 2;
+
+        const body = new THREE.Mesh(new THREE.BoxGeometry(offset.w, offset.h, offset.d), wallMat);
+        body.position.y = offset.h / 2;
+        body.castShadow = true;
+        body.receiveShadow = true;
+        building.add(body);
+
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(offset.w, offset.d) * 0.72, 2.4, 4), roofMat);
+        roof.position.y = offset.h + 1.2;
+        roof.rotation.y = Math.PI / 4;
+        roof.castShadow = true;
+        building.add(roof);
+
+        const door = new THREE.Mesh(new THREE.BoxGeometry(Math.min(2.1, offset.w * 0.32), offset.h * 0.42, 0.08), glassMat);
+        door.position.set(0, offset.h * 0.22, -offset.d / 2 - 0.05);
+        building.add(door);
+
+        if (offset.h > 9) {
+          const mast = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.22, 0.32, 6, 6),
+            new THREE.MeshStandardMaterial({ color: "#e2e8f0", roughness: 0.7 })
+          );
+          mast.position.y = offset.h + 5;
+          mast.castShadow = true;
+          building.add(mast);
+        }
+
+        group.add(building);
+      }
+      const label = makeTextSprite(THREE, poi.name || "", {
+        width: 260,
+        height: 54,
+        size: 19,
+        worldWidth: 13,
+        worldHeight: 2.2,
+        background: "rgba(15, 23, 42, 0.5)"
+      });
+      label.position.set(0, 16, 0);
+      group.add(label);
+      this.structureRoot.add(group);
+    }
+  }
+
   createSpawnIsland() {
     const group = new THREE.Group();
     group.position.set(0, 0, SPAWN_ISLAND_Z);
     const spawnWater = new THREE.Mesh(
-      new THREE.PlaneGeometry(130, 130),
+      new THREE.PlaneGeometry(86, 86),
       new THREE.MeshBasicMaterial({ color: "#0ea5c7", transparent: true, opacity: 0.72 })
     );
     spawnWater.rotation.x = -Math.PI / 2;
     spawnWater.position.y = -2.3;
     group.add(spawnWater);
     const island = new THREE.Mesh(
-      new THREE.CylinderGeometry(28, 34, 5, 9),
+      new THREE.CylinderGeometry(18, 22, 4, 9),
       new THREE.MeshStandardMaterial({ color: "#6da45f", roughness: 0.92 })
     );
-    island.position.y = 0.35;
+    island.position.y = 0.25;
     island.receiveShadow = true;
     group.add(island);
     const pad = new THREE.Mesh(
-      new THREE.CylinderGeometry(12, 12, 0.35, 8),
+      new THREE.CylinderGeometry(7.5, 7.5, 0.3, 8),
       new THREE.MeshStandardMaterial({ color: "#334155", roughness: 0.82 })
     );
-    pad.position.y = 3.05;
+    pad.position.y = 2.45;
     group.add(pad);
     const sign = makeTextSprite(THREE, "Spawn Island", {
       width: 240,
       height: 56,
       size: 22,
-      worldWidth: 9,
+      worldWidth: 7,
       worldHeight: 2
     });
-    sign.position.set(0, 8.4, -12);
+    sign.position.set(0, 6.7, -9);
     group.add(sign);
     this.root.add(group);
   }
@@ -246,9 +332,8 @@ export class World {
         this.root.add(model);
         this.fallbackRoot.visible = false;
         this.modelLoaded = true;
-        this.alignModelToPlayableGround(model);
-        this.heightMap = this.createHeightMap(model);
-        this.mapImage = this.createMapImage(model);
+        this.mapImage = this.createFallbackMapImage();
+        this.scheduleMapImage(model);
       },
       undefined,
       (error) => {
@@ -280,8 +365,8 @@ export class World {
     model.position.x -= center.x;
     model.position.z -= center.z;
 
-    // Coarse first pass. A raycast sampler below refines this after the model is added.
-    const terrainSurfaceY = box.min.y + finalSize.y * 0.52;
+    // Coarse anchor for thick map meshes: lift the model so the upper terrain band sits at gameplay ground.
+    const terrainSurfaceY = box.min.y + finalSize.y * 0.36;
     model.position.y -= terrainSurfaceY;
     model.position.y += MAIN_GROUND_Y;
 
@@ -296,90 +381,24 @@ export class World {
     });
   }
 
-  alignModelToPlayableGround(model) {
-    const sample = this.sampleModelSurface(model, 19);
-    if (!sample.length) return;
-    sample.sort((a, b) => a - b);
-    const median = sample[Math.floor(sample.length * 0.5)];
-    if (Number.isFinite(median)) model.position.y += MAIN_GROUND_Y - median;
-    model.updateMatrixWorld(true);
-  }
-
-  sampleModelSurface(model, steps = 17) {
-    model.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(model);
-    const meshes = [];
-    model.traverse((child) => {
-      if (child.isMesh) meshes.push(child);
-    });
-    const values = [];
-    if (!meshes.length) return values;
-    const raycaster = new THREE.Raycaster();
-    const origin = new THREE.Vector3(0, box.max.y + 80, 0);
-    const down = new THREE.Vector3(0, -1, 0);
-    const half = MAP_MODEL_TARGET_SIZE * 0.44;
-    for (let iz = 0; iz < steps; iz += 1) {
-      const z = -half + (iz / Math.max(1, steps - 1)) * half * 2;
-      for (let ix = 0; ix < steps; ix += 1) {
-        const x = -half + (ix / Math.max(1, steps - 1)) * half * 2;
-        origin.set(x, box.max.y + 80, z);
-        raycaster.set(origin, down);
-        const hit = raycaster.intersectObjects(meshes, false)[0];
-        if (hit && Number.isFinite(hit.point.y)) values.push(hit.point.y);
+  scheduleMapImage(model) {
+    const build = () => {
+      try {
+        this.mapImage = this.createMapImage(model);
+      } catch (error) {
+        console.warn("Map image generation failed; keeping fallback map.", error);
       }
+    };
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(build, { timeout: 2500 });
+    } else {
+      window.setTimeout(build, 500);
     }
-    return values;
-  }
-
-  createHeightMap(model) {
-    model.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(model);
-    const meshes = [];
-    model.traverse((child) => {
-      if (child.isMesh) meshes.push(child);
-    });
-    if (!meshes.length) return null;
-    const size = 48;
-    const half = MAP_MODEL_TARGET_SIZE / 2;
-    const data = new Float32Array(size * size);
-    const raycaster = new THREE.Raycaster();
-    const origin = new THREE.Vector3(0, box.max.y + 80, 0);
-    const down = new THREE.Vector3(0, -1, 0);
-    for (let iz = 0; iz < size; iz += 1) {
-      const z = -half + (iz / (size - 1)) * MAP_MODEL_TARGET_SIZE;
-      for (let ix = 0; ix < size; ix += 1) {
-        const x = -half + (ix / (size - 1)) * MAP_MODEL_TARGET_SIZE;
-        origin.set(x, box.max.y + 80, z);
-        raycaster.set(origin, down);
-        const hit = raycaster.intersectObjects(meshes, false)[0];
-        data[iz * size + ix] = hit && Number.isFinite(hit.point.y) ? hit.point.y : MAIN_GROUND_Y;
-      }
-    }
-    return { data, size, half };
   }
 
   getVisualGroundY(x, z) {
     if (Math.hypot(x, z - SPAWN_ISLAND_Z) <= SPAWN_ISLAND_RADIUS) return SPAWN_ISLAND_GROUND_Y;
-    const map = this.heightMap;
-    if (!map) return MAIN_GROUND_Y;
-    const u = (x + map.half) / (map.half * 2);
-    const v = (z + map.half) / (map.half * 2);
-    if (u < 0 || u > 1 || v < 0 || v > 1) return MAIN_GROUND_Y;
-    const fx = u * (map.size - 1);
-    const fz = v * (map.size - 1);
-    const x0 = Math.floor(fx);
-    const z0 = Math.floor(fz);
-    const x1 = Math.min(map.size - 1, x0 + 1);
-    const z1 = Math.min(map.size - 1, z0 + 1);
-    const tx = fx - x0;
-    const tz = fz - z0;
-    const a = map.data[z0 * map.size + x0];
-    const b = map.data[z0 * map.size + x1];
-    const c = map.data[z1 * map.size + x0];
-    const d = map.data[z1 * map.size + x1];
-    const top = a + (b - a) * tx;
-    const bottom = c + (d - c) * tx;
-    return top + (bottom - top) * tz;
+    return MAIN_GROUND_Y;
   }
 
   getMapImage() {
