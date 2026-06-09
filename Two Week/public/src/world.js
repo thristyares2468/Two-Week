@@ -4,6 +4,7 @@ import { makeTextSprite } from "./utils.js";
 
 const MAP_MODEL_TARGET_SIZE = 540;
 const MAP_MODEL_URL = new URL("../assets/models/map.glb", import.meta.url).href;
+const SPAWN_ISLAND_Z = -405;
 
 const POIS = [
   { name: "Rusty Depot", x: -54, z: -42, color: "#f97316" },
@@ -25,6 +26,7 @@ export class World {
     this.fallbackRoot = new THREE.Group();
     this.bus = null;
     this.modelLoaded = false;
+    this.mapImage = null;
     this.scene.add(this.root);
     this.root.add(this.fallbackRoot);
     this.createLighting();
@@ -155,18 +157,26 @@ export class World {
 
   createSpawnIsland() {
     const group = new THREE.Group();
-    group.position.set(0, -0.5, -150);
+    group.position.set(0, 0, SPAWN_ISLAND_Z);
+    const spawnWater = new THREE.Mesh(
+      new THREE.PlaneGeometry(130, 130),
+      new THREE.MeshBasicMaterial({ color: "#0ea5c7", transparent: true, opacity: 0.72 })
+    );
+    spawnWater.rotation.x = -Math.PI / 2;
+    spawnWater.position.y = -2.3;
+    group.add(spawnWater);
     const island = new THREE.Mesh(
       new THREE.CylinderGeometry(28, 34, 5, 9),
       new THREE.MeshStandardMaterial({ color: "#6da45f", roughness: 0.92 })
     );
+    island.position.y = 0.35;
     island.receiveShadow = true;
     group.add(island);
     const pad = new THREE.Mesh(
       new THREE.CylinderGeometry(12, 12, 0.35, 8),
       new THREE.MeshStandardMaterial({ color: "#334155", roughness: 0.82 })
     );
-    pad.position.y = 2.7;
+    pad.position.y = 3.05;
     group.add(pad);
     const sign = makeTextSprite(THREE, "Spawn Island", {
       width: 240,
@@ -175,7 +185,7 @@ export class World {
       worldWidth: 9,
       worldHeight: 2
     });
-    sign.position.set(0, 8, -12);
+    sign.position.set(0, 8.4, -12);
     group.add(sign);
     this.root.add(group);
   }
@@ -232,10 +242,12 @@ export class World {
         this.root.add(model);
         this.fallbackRoot.visible = false;
         this.modelLoaded = true;
+        this.mapImage = this.createMapImage(model);
       },
       undefined,
       (error) => {
         this.modelLoaded = false;
+        this.mapImage = this.createFallbackMapImage();
         console.warn("Map model failed to load; using generated fallback map.", error);
       }
     );
@@ -277,6 +289,95 @@ export class World {
         }
       }
     });
+  }
+
+  getMapImage() {
+    if (!this.mapImage) this.mapImage = this.createFallbackMapImage();
+    return this.mapImage;
+  }
+
+  createMapImage(model) {
+    const size = 1024;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(size, size, false);
+    renderer.setClearColor("#0e7490", 1);
+
+    const mapScene = new THREE.Scene();
+    mapScene.background = new THREE.Color("#0e7490");
+    const clone = model.clone(true);
+    clone.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+          mat.side = THREE.DoubleSide;
+          mat.needsUpdate = true;
+        }
+      }
+    });
+    mapScene.add(clone);
+    mapScene.add(new THREE.HemisphereLight("#ffffff", "#23402f", 2.2));
+    const sun = new THREE.DirectionalLight("#fff7ed", 2.4);
+    sun.position.set(80, 220, 120);
+    mapScene.add(sun);
+
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(MAP_MODEL_TARGET_SIZE * 1.25, MAP_MODEL_TARGET_SIZE * 1.25),
+      new THREE.MeshBasicMaterial({ color: "#0ea5c7" })
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = -3;
+    mapScene.add(water);
+
+    const camera = new THREE.OrthographicCamera(
+      -MAP_MODEL_TARGET_SIZE / 2,
+      MAP_MODEL_TARGET_SIZE / 2,
+      MAP_MODEL_TARGET_SIZE / 2,
+      -MAP_MODEL_TARGET_SIZE / 2,
+      0.1,
+      1200
+    );
+    camera.position.set(0, 720, 0.01);
+    camera.up.set(0, 0, -1);
+    camera.lookAt(0, 0, 0);
+    renderer.render(mapScene, camera);
+    const output = document.createElement("canvas");
+    output.width = size;
+    output.height = size;
+    output.getContext("2d").drawImage(canvas, 0, 0);
+    renderer.dispose();
+    return output;
+  }
+
+  createFallbackMapImage() {
+    const size = 1024;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const water = ctx.createLinearGradient(0, 0, size, size);
+    water.addColorStop(0, "#0ea5c7");
+    water.addColorStop(1, "#064e70");
+    ctx.fillStyle = water;
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = "#3f9f52";
+    ctx.beginPath();
+    const points = [[0.48, 0.03], [0.73, 0.1], [0.96, 0.34], [0.85, 0.72], [0.55, 0.96], [0.25, 0.85], [0.04, 0.55], [0.1, 0.22]];
+    points.forEach(([x, y], i) => i ? ctx.lineTo(x * size, y * size) : ctx.moveTo(x * size, y * size));
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    for (let i = 0; i < 34; i += 1) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      ctx.beginPath();
+      ctx.arc(x, y, 8 + Math.random() * 18, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return canvas;
   }
 
   updateDropState(dropState) {

@@ -173,6 +173,18 @@
         <div id="fpsCounter" class="fps-counter hidden">FPS --</div>
       </div>
 
+      <section id="pauseOverlay" class="pause-overlay hidden" aria-modal="true" role="dialog" aria-label="Pause menu">
+        <div class="pause-card">
+          <div class="brand-kicker">Paused</div>
+          <h2>Two Weeks</h2>
+          <div class="pause-actions">
+            <button id="resumeBtn" class="primary">Resume</button>
+            <button id="pauseSettingsBtn">Settings</button>
+            <button id="pauseLeaveBtn">Leave Match</button>
+          </div>
+        </div>
+      </section>
+
       <section id="mapOverlay" class="map-overlay hidden">
         <div class="map-frame">
           <div class="map-header">
@@ -186,9 +198,6 @@
           <div class="map-legend">
             <span><b class="legend-player"></b> You</span>
             <span><b class="legend-enemy"></b> Players</span>
-            <span><b class="legend-loot"></b> Floor loot</span>
-            <span><b class="legend-chest"></b> Chests</span>
-            <span><b class="legend-ammo"></b> Ammo boxes</span>
             <span><b class="legend-storm"></b> Safe zone</span>
           </div>
         </div>

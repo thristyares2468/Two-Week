@@ -4,6 +4,8 @@ import { DEFAULT_KEYBINDS } from "./settings.js";
 
 const MAP_SIZE = 560;
 const MAP_POI_SCALE = 1.7;
+let activeMapImage = null;
+
 const MAP_POIS = [
   { name: "Craggy Cliffs", x: 8, z: -122 },
   { name: "Pleasant Park", x: -52, z: -84 },
@@ -69,6 +71,7 @@ export class UIManager {
     this.lastFps = 0;
     this.lastPing = 0;
     this.mapOpen = false;
+    this.paused = false;
     this.elements = this.collect();
     this.bindDom();
     this.renderSettingsModal = this.renderSettingsModal.bind(this);
@@ -84,6 +87,7 @@ export class UIManager {
       results: byId("resultsScreen"),
       modal: byId("modalScreen"),
       mapOverlay: byId("mapOverlay"),
+      pauseOverlay: byId("pauseOverlay"),
       modalContent: byId("modalContent"),
       toastLayer: byId("toastLayer"),
       lobbyLayout: document.querySelector(".lobby-layout"),
@@ -114,6 +118,9 @@ export class UIManager {
       miniMap: byId("miniMap"),
       fullMap: byId("fullMap"),
       mapClose: byId("mapCloseBtn"),
+      resume: byId("resumeBtn"),
+      pauseSettings: byId("pauseSettingsBtn"),
+      pauseLeave: byId("pauseLeaveBtn"),
       networkStats: byId("networkStats"),
       hitMarker: byId("hitMarker"),
       buildIndicator: byId("buildIndicator"),
@@ -158,6 +165,12 @@ export class UIManager {
     click(this.elements.howToPlay, () => this.openHowToPlay());
     click(this.elements.modalClose, () => this.closeModal());
     click(this.elements.mapClose, () => this.closeMap());
+    click(this.elements.resume, () => this.callbacks.resumeGame?.());
+    click(this.elements.pauseSettings, () => this.openSettings());
+    click(this.elements.pauseLeave, () => {
+      this.setPaused(false);
+      this.callbacks.leaveRoom?.();
+    });
     this.elements.roomCodeInput.addEventListener("input", () => {
       this.elements.roomCodeInput.value = this.elements.roomCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
     });
@@ -197,7 +210,7 @@ export class UIManager {
   }
 
   renderLobbyMapTab() {
-    this.elements.lobbyTabPanel.innerHTML = '<div class="tab-shell map-tab-shell"><div class="map-tab-copy"><div class="brand-kicker">Island Map</div><h2>Drop Planner</h2><p>Named areas, loot sources, and storm rings appear here before and during matches.</p></div><div class="lobby-map-card"><canvas id="lobbyMapCanvas" width="900" height="900"></canvas><div class="map-legend"><span><b class="legend-player"></b> You</span><span><b class="legend-enemy"></b> Players</span><span><b class="legend-loot"></b> Floor loot</span><span><b class="legend-chest"></b> Chests</span><span><b class="legend-ammo"></b> Ammo boxes</span><span><b class="legend-storm"></b> Safe zone</span></div></div></div>';
+    this.elements.lobbyTabPanel.innerHTML = '<div class="tab-shell map-tab-shell"><div class="map-tab-copy"><div class="brand-kicker">Island Map</div><h2>Drop Planner</h2><p>Named areas, storm rings, and player positions appear here before and during matches.</p></div><div class="lobby-map-card"><canvas id="lobbyMapCanvas" width="900" height="900"></canvas><div class="map-legend"><span><b class="legend-player"></b> You</span><span><b class="legend-enemy"></b> Players</span><span><b class="legend-storm"></b> Safe zone</span></div></div></div>';
     const canvas = document.getElementById("lobbyMapCanvas");
     drawMap(canvas, this.snapshot || makeLobbyMapSnapshot(), { compact: false, showLabels: true });
   }
@@ -307,6 +320,7 @@ export class UIManager {
   }
 
   showMenu() {
+    this.setPaused(false);
     this.elements.menu.classList.remove("hidden");
     this.elements.room.classList.add("hidden");
     this.elements.results.classList.add("hidden");
@@ -394,6 +408,28 @@ export class UIManager {
     this.elements.mapOverlay.classList.add("hidden");
   }
 
+  setMapImage(image) {
+    if (!image || activeMapImage === image) return;
+    activeMapImage = image;
+    if (this.snapshot) {
+      this.renderMiniMap(this.snapshot);
+      if (this.mapOpen) this.renderFullMap(this.snapshot);
+    }
+    const lobbyCanvas = document.getElementById("lobbyMapCanvas");
+    if (lobbyCanvas) drawMap(lobbyCanvas, this.snapshot || makeLobbyMapSnapshot(), { compact: false, showLabels: true });
+  }
+
+  setPaused(paused) {
+    this.paused = Boolean(paused);
+    this.elements.pauseOverlay.classList.toggle("hidden", !this.paused);
+    if (this.paused) this.closeMap();
+  }
+
+  togglePause() {
+    this.setPaused(!this.paused);
+    return this.paused;
+  }
+
   showBuildIndicator(enabled, piece) {
     this.elements.buildIndicator.classList.toggle("hidden", !enabled);
     this.elements.buildIndicator.textContent = `Build: ${pieceName(piece)}`;
@@ -411,6 +447,7 @@ export class UIManager {
   }
 
   showResults(snapshot) {
+    this.setPaused(false);
     this.elements.menu.classList.add("hidden");
     this.elements.room.classList.add("hidden");
     this.elements.hud.classList.add("hidden");
@@ -529,7 +566,7 @@ export class UIManager {
         <li>Move with WASD, sprint with Shift, jump with Space, and look with the mouse. Keyboard binds can be changed in Settings.</li>
         <li>Left click shoots. Press R to reload and 1-5 to switch inventory slots by default.</li>
         <li>Press E near glowing loot to pick it up. Press G to use a selected healing or shield item by default.</li>
-        <li>Press M to open the island map and check storm, players, floor loot, chests, and ammo boxes by default.</li>
+        <li>Press M to open the island map and check storm and player positions by default.</li>
         <li>Press Q for build mode. Z, X, C, and V choose wall, ramp, floor, and roof by default. Left click places the preview.</li>
         <li>The match opens on Spawn Island, then the battle bus carries players across the main island. Press Space during the bus phase to drop early.</li>
         <li>Stay inside the storm circle. The last surviving player wins.</li>
@@ -597,22 +634,6 @@ function drawMap(canvas, snapshot, options = {}) {
     }
   }
 
-  const loot = snapshot.loot || [];
-  for (const item of loot) {
-    const p = toMap(item);
-    const isChest = item.type === "chest";
-    const isAmmoBox = item.type === "ammoBox";
-    ctx.fillStyle = isChest ? "#f59e0b" : isAmmoBox ? "#22c55e" : "#f8fafc";
-    if (isChest) {
-      ctx.fillRect(p.x - (compact ? 2 : 4), p.y - (compact ? 2 : 4), compact ? 4 : 8, compact ? 4 : 8);
-    } else if (isAmmoBox) {
-      ctx.fillRect(p.x - (compact ? 2 : 4), p.y - (compact ? 1 : 3), compact ? 4 : 8, compact ? 2 : 6);
-    } else {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, compact ? 0.9 : 2.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
 
   if (snapshot.storm && snapshot.storm.current) {
     const zone = snapshot.storm.current;
@@ -653,11 +674,21 @@ function drawMap(canvas, snapshot, options = {}) {
     ctx.fillStyle = "#cbd5e1";
     ctx.font = "800 15px Inter, sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`Storm: ${snapshot.storm ? `${snapshot.storm.mode} ${formatSeconds(snapshot.storm.secondsRemaining)}` : "waiting"} | Loot: ${loot.length} | Players: ${snapshot.playersRemaining}`, 38, h - 35);
+    ctx.fillText(`Storm: ${snapshot.storm ? `${snapshot.storm.mode} ${formatSeconds(snapshot.storm.secondsRemaining)}` : "waiting"} | Players: ${snapshot.playersRemaining}`, 38, h - 35);
   }
 }
 
 function drawIslandBase(ctx, w, h, centerX, centerY, usable, compact) {
+  if (activeMapImage) {
+    ctx.save();
+    ctx.fillStyle = "#0e7490";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(activeMapImage, centerX - usable / 2, centerY - usable / 2, usable, usable);
+    ctx.fillStyle = compact ? "rgba(2, 6, 23, 0.08)" : "rgba(2, 6, 23, 0.04)";
+    ctx.fillRect(centerX - usable / 2, centerY - usable / 2, usable, usable);
+    ctx.restore();
+    return;
+  }
   const water = ctx.createLinearGradient(0, 0, w, h);
   water.addColorStop(0, "#0ea5c7");
   water.addColorStop(0.55, "#087d9c");

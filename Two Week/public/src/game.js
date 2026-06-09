@@ -80,6 +80,11 @@ export class TwoWeeksGame {
       sandbox: () => this.network.sandbox(),
       startMatch: () => this.network.startMatch(),
       leaveRoom: () => this.network.leaveRoom(),
+      resumeGame: () => {
+        this.input.setPaused(false);
+        this.ui.setPaused(false);
+        if (this.snapshot && this.snapshot.status === "playing" && this.snapshot.self && this.snapshot.self.alive) this.input.setActive(true);
+      },
       playAgain: (room) => {
         if (room && room.roomType === "practice") this.network.practice();
         else if (room && room.roomType === "sandbox") this.network.sandbox();
@@ -152,8 +157,8 @@ export class TwoWeeksGame {
       this.frames = 0;
       this.fpsClock = time;
     }
+    this.ui.setMapImage(this.world.getMapImage());
     if (!this.snapshot) return;
-
     this.world.updateDropState(this.snapshot.dropState);
     this.players.update(this.snapshot.players || [], this.localId, dt, this.camera);
     this.buildings.update(this.snapshot.builds || []);
@@ -187,6 +192,10 @@ export class TwoWeeksGame {
 
   consumeActions(preview) {
     for (const action of this.input.consumeActions()) {
+      if (action.type === "pause") {
+        this.ui.setPaused(action.paused);
+        continue;
+      }
       if (action.type === "toggleMap") {
         const opened = this.ui.toggleMap(this.snapshot);
         if (opened && document.pointerLockElement) document.exitPointerLock();

@@ -87,6 +87,11 @@ export class InputController extends EventTarget {
     });
   }
 
+  setPaused(paused) {
+    this.paused = Boolean(paused);
+    if (this.paused && document.pointerLockElement === this.canvas) document.exitPointerLock();
+  }
+
   setActive(active) {
     this.active = active;
     if (!active && document.pointerLockElement === this.canvas) {

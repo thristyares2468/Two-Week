@@ -890,6 +890,38 @@ select {
   background: rgba(0, 0, 0, 0.52);
 }
 
+.pause-overlay {
+  pointer-events: auto;
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.pause-card {
+  width: min(360px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 22px;
+  background: rgba(8, 21, 36, 0.94);
+  box-shadow: var(--shadow);
+}
+
+.pause-card h2 {
+  margin: 4px 0 18px;
+  font-size: 36px;
+  letter-spacing: 0;
+}
+
+.pause-actions {
+  display: grid;
+  gap: 10px;
+}
+
 .map-overlay {
   pointer-events: auto;
   position: fixed;
