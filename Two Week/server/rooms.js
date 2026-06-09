@@ -3,6 +3,8 @@ const {
   COUNTDOWN_SECONDS,
   MAP_SIZE,
   MAX_PLAYERS,
+  SPAWN_ISLAND_GROUND_Y,
+  SPAWN_ISLAND_Z,
   QUICK_START_PLAYERS,
   getTerrainHeightAt,
   lerp,
@@ -346,8 +348,8 @@ function makeSpawnIslandSpawn(index, count) {
   const radius = 9 + (index % 4) * 3;
   return {
     x: Math.cos(angle) * radius,
-    y: 1.5,
-    z: -MAP_SIZE * 0.46 + Math.sin(angle) * radius,
+    y: SPAWN_ISLAND_GROUND_Y,
+    z: SPAWN_ISLAND_Z + Math.sin(angle) * radius,
     yaw: 0
   };
 }

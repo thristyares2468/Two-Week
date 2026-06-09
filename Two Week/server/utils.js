@@ -8,6 +8,10 @@ const MAX_PLAYERS = Number(process.env.TWO_WEEKS_MAX_PLAYERS || 16);
 const BOT_LOBBY_BOT_COUNT = Number(process.env.TWO_WEEKS_BOT_COUNT || 11);
 const QUICK_START_PLAYERS = Number(process.env.TWO_WEEKS_QUICK_START_PLAYERS || 2);
 const COUNTDOWN_SECONDS = 6;
+const MAIN_GROUND_Y = 0.35;
+const SPAWN_ISLAND_Z = -405;
+const SPAWN_ISLAND_RADIUS = 38;
+const SPAWN_ISLAND_GROUND_Y = 2.85;
 
 const RARITIES = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
 const RARITY_COLORS = {
@@ -341,12 +345,12 @@ function randomPointInCircle(radius, center = { x: 0, z: 0 }) {
   };
 }
 
+function isOnSpawnIsland(x, z) {
+  return Math.hypot(x, z - SPAWN_ISLAND_Z) <= SPAWN_ISLAND_RADIUS;
+}
+
 function getTerrainHeightAt(x, z) {
-  const nx = x / Math.max(1, MAP_SIZE);
-  const nz = z / Math.max(1, MAP_SIZE);
-  const rolling = Math.sin(nx * 18) * 1.25 + Math.cos(nz * 16) * 1.05 + Math.sin((nx + nz) * 13) * 0.8;
-  const ridge = Math.max(0, Math.sin((x - z) * 0.018)) * 1.15;
-  return Math.max(0, 1.25 + rolling + ridge);
+  return isOnSpawnIsland(x, z) ? SPAWN_ISLAND_GROUND_Y : MAIN_GROUND_Y;
 }
 
 function groundLootY(x, z, baseOffset = 0.9) {
@@ -420,6 +424,7 @@ module.exports = {
   BOT_LOBBY_BOT_COUNT,
   CONSUMABLE_STATS,
   COUNTDOWN_SECONDS,
+  MAIN_GROUND_Y,
   MAP_SIZE,
   MAX_PLAYERS,
   PLAYER_HEIGHT,
@@ -430,6 +435,9 @@ module.exports = {
   ROOM_CODE_CHARS,
   SERVER_TICK_RATE,
   SNAPSHOT_RATE,
+  SPAWN_ISLAND_GROUND_Y,
+  SPAWN_ISLAND_RADIUS,
+  SPAWN_ISLAND_Z,
   WEAPON_STATS,
   clamp,
   clonePublicItem,
@@ -437,6 +445,7 @@ module.exports = {
   createWeaponInstance,
   getTerrainHeightAt,
   groundLootY,
+  isOnSpawnIsland,
   distance2D,
   distance3D,
   lerp,

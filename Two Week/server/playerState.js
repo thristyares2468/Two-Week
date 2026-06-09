@@ -2,12 +2,15 @@ const {
   AMMO_START,
   MAP_SIZE,
   PLAYER_HEIGHT,
+  SPAWN_ISLAND_RADIUS,
+  SPAWN_ISLAND_Z,
   clamp,
   createConsumableInstance,
   createWeaponInstance,
   distance2D,
   normalizeAngle,
   getTerrainHeightAt,
+  isOnSpawnIsland,
   safeNumber,
   sanitizeName,
   WEAPON_STATS
@@ -202,11 +205,23 @@ function applyInput(player, room, dt) {
     player.grounded = true;
   }
 
-  const half = MAP_SIZE / 2 - 2;
-  player.x = clamp(player.x, -half, half);
-  player.z = clamp(player.z, -half, half);
-  resolvePlayerBuildCollision(player, room);
-  clampToArena(player);
+  if (room && room.dropState && room.dropState.phase === "spawnIsland" && isOnSpawnIsland(player.x, player.z)) {
+    const dx = player.x;
+    const dz = player.z - SPAWN_ISLAND_Z;
+    const distance = Math.hypot(dx, dz);
+    const max = SPAWN_ISLAND_RADIUS - 2;
+    if (distance > max) {
+      const scale = max / Math.max(0.001, distance);
+      player.x = dx * scale;
+      player.z = SPAWN_ISLAND_Z + dz * scale;
+    }
+  } else {
+    const half = MAP_SIZE / 2 - 2;
+    player.x = clamp(player.x, -half, half);
+    player.z = clamp(player.z, -half, half);
+    resolvePlayerBuildCollision(player, room);
+    clampToArena(player);
+  }
 }
 
 function resolveInventoryIndex(player, index = player.selectedSlot) {
