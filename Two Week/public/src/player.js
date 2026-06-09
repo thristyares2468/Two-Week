@@ -10,7 +10,7 @@ export class PlayerRenderer {
     this.players = new Map();
   }
 
-  update(players, localId, dt, camera) {
+  update(players, localId, dt, camera, groundHeight = null) {
     const seen = new Set();
     for (const state of players) {
       seen.add(state.id);
@@ -21,8 +21,10 @@ export class PlayerRenderer {
         this.scene.add(entry.group);
       }
       const speed = state.id === localId ? 1 : 1 - Math.exp(-12 * dt);
+      const visualGround = groundHeight ? groundHeight(state.x, state.z) : state.y;
+      const targetY = state.y > visualGround + 6 ? state.y : visualGround;
       entry.group.position.x = lerp(entry.group.position.x, state.x, speed);
-      entry.group.position.y = lerp(entry.group.position.y, state.y, speed);
+      entry.group.position.y = lerp(entry.group.position.y, targetY, speed);
       entry.group.position.z = lerp(entry.group.position.z, state.z, speed);
       entry.group.rotation.y = lerpAngle(entry.group.rotation.y, state.yaw, speed);
       entry.body.material.color.set(state.alive ? state.color : "#64748b");

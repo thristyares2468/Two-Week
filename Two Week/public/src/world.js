@@ -5,6 +5,9 @@ import { makeTextSprite } from "./utils.js";
 const MAP_MODEL_TARGET_SIZE = 540;
 const MAP_MODEL_URL = new URL("../assets/models/map.glb", import.meta.url).href;
 const SPAWN_ISLAND_Z = -405;
+const SPAWN_ISLAND_RADIUS = 38;
+const SPAWN_ISLAND_GROUND_Y = 2.85;
+const MAIN_GROUND_Y = 0.35;
 
 const POIS = [
   { name: "Rusty Depot", x: -54, z: -42, color: "#f97316" },
@@ -27,6 +30,7 @@ export class World {
     this.bus = null;
     this.modelLoaded = false;
     this.mapImage = null;
+    this.heightMap = null;
     this.scene.add(this.root);
     this.root.add(this.fallbackRoot);
     this.createLighting();
@@ -242,6 +246,8 @@ export class World {
         this.root.add(model);
         this.fallbackRoot.visible = false;
         this.modelLoaded = true;
+        this.alignModelToPlayableGround(model);
+        this.heightMap = this.createHeightMap(model);
         this.mapImage = this.createMapImage(model);
       },
       undefined,
@@ -274,11 +280,10 @@ export class World {
     model.position.x -= center.x;
     model.position.z -= center.z;
 
-    // User-provided island meshes often include ocean depth/underside geometry.
-    // Anchor the upper terrain band to the server ground plane instead of the lowest vertex.
-    const terrainSurfaceY = box.min.y + finalSize.y * 0.72;
+    // Coarse first pass. A raycast sampler below refines this after the model is added.
+    const terrainSurfaceY = box.min.y + finalSize.y * 0.52;
     model.position.y -= terrainSurfaceY;
-    model.position.y += 0.35;
+    model.position.y += MAIN_GROUND_Y;
 
     model.traverse((child) => {
       if (child.isMesh && child.material) {
@@ -289,6 +294,92 @@ export class World {
         }
       }
     });
+  }
+
+  alignModelToPlayableGround(model) {
+    const sample = this.sampleModelSurface(model, 19);
+    if (!sample.length) return;
+    sample.sort((a, b) => a - b);
+    const median = sample[Math.floor(sample.length * 0.5)];
+    if (Number.isFinite(median)) model.position.y += MAIN_GROUND_Y - median;
+    model.updateMatrixWorld(true);
+  }
+
+  sampleModelSurface(model, steps = 17) {
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model);
+    const meshes = [];
+    model.traverse((child) => {
+      if (child.isMesh) meshes.push(child);
+    });
+    const values = [];
+    if (!meshes.length) return values;
+    const raycaster = new THREE.Raycaster();
+    const origin = new THREE.Vector3(0, box.max.y + 80, 0);
+    const down = new THREE.Vector3(0, -1, 0);
+    const half = MAP_MODEL_TARGET_SIZE * 0.44;
+    for (let iz = 0; iz < steps; iz += 1) {
+      const z = -half + (iz / Math.max(1, steps - 1)) * half * 2;
+      for (let ix = 0; ix < steps; ix += 1) {
+        const x = -half + (ix / Math.max(1, steps - 1)) * half * 2;
+        origin.set(x, box.max.y + 80, z);
+        raycaster.set(origin, down);
+        const hit = raycaster.intersectObjects(meshes, false)[0];
+        if (hit && Number.isFinite(hit.point.y)) values.push(hit.point.y);
+      }
+    }
+    return values;
+  }
+
+  createHeightMap(model) {
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model);
+    const meshes = [];
+    model.traverse((child) => {
+      if (child.isMesh) meshes.push(child);
+    });
+    if (!meshes.length) return null;
+    const size = 48;
+    const half = MAP_MODEL_TARGET_SIZE / 2;
+    const data = new Float32Array(size * size);
+    const raycaster = new THREE.Raycaster();
+    const origin = new THREE.Vector3(0, box.max.y + 80, 0);
+    const down = new THREE.Vector3(0, -1, 0);
+    for (let iz = 0; iz < size; iz += 1) {
+      const z = -half + (iz / (size - 1)) * MAP_MODEL_TARGET_SIZE;
+      for (let ix = 0; ix < size; ix += 1) {
+        const x = -half + (ix / (size - 1)) * MAP_MODEL_TARGET_SIZE;
+        origin.set(x, box.max.y + 80, z);
+        raycaster.set(origin, down);
+        const hit = raycaster.intersectObjects(meshes, false)[0];
+        data[iz * size + ix] = hit && Number.isFinite(hit.point.y) ? hit.point.y : MAIN_GROUND_Y;
+      }
+    }
+    return { data, size, half };
+  }
+
+  getVisualGroundY(x, z) {
+    if (Math.hypot(x, z - SPAWN_ISLAND_Z) <= SPAWN_ISLAND_RADIUS) return SPAWN_ISLAND_GROUND_Y;
+    const map = this.heightMap;
+    if (!map) return MAIN_GROUND_Y;
+    const u = (x + map.half) / (map.half * 2);
+    const v = (z + map.half) / (map.half * 2);
+    if (u < 0 || u > 1 || v < 0 || v > 1) return MAIN_GROUND_Y;
+    const fx = u * (map.size - 1);
+    const fz = v * (map.size - 1);
+    const x0 = Math.floor(fx);
+    const z0 = Math.floor(fz);
+    const x1 = Math.min(map.size - 1, x0 + 1);
+    const z1 = Math.min(map.size - 1, z0 + 1);
+    const tx = fx - x0;
+    const tz = fz - z0;
+    const a = map.data[z0 * map.size + x0];
+    const b = map.data[z0 * map.size + x1];
+    const c = map.data[z1 * map.size + x0];
+    const d = map.data[z1 * map.size + x1];
+    const top = a + (b - a) * tx;
+    const bottom = c + (d - c) * tx;
+    return top + (bottom - top) * tz;
   }
 
   getMapImage() {

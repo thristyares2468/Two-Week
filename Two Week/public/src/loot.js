@@ -8,7 +8,7 @@ export class LootRenderer {
     this.time = 0;
   }
 
-  update(items, dt) {
+  update(items, dt, groundHeight = null) {
     this.time += dt;
     const seen = new Set();
     for (const item of items || []) {
@@ -20,7 +20,9 @@ export class LootRenderer {
         this.scene.add(mesh);
       }
       const bob = item.container ? Math.sin(this.time * 2 + item.x) * 0.04 : Math.sin(this.time * 3 + item.x) * 0.18;
-      mesh.position.set(item.x, item.y + bob, item.z);
+      const visualGround = groundHeight ? groundHeight(item.x, item.z) : item.y;
+      const offset = item.type === "chest" ? 1.2 : item.type === "ammoBox" ? 0.85 : 0.65;
+      mesh.position.set(item.x, visualGround + offset + bob, item.z);
       mesh.rotation.y += item.container ? dt * 0.25 : dt * 1.8;
     }
     for (const [id, mesh] of this.items) {

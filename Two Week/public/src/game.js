@@ -160,9 +160,10 @@ export class TwoWeeksGame {
     this.ui.setMapImage(this.world.getMapImage());
     if (!this.snapshot) return;
     this.world.updateDropState(this.snapshot.dropState);
-    this.players.update(this.snapshot.players || [], this.localId, dt, this.camera);
+    const groundHeight = (x, z) => this.world.getVisualGroundY(x, z);
+    this.players.update(this.snapshot.players || [], this.localId, dt, this.camera, groundHeight);
     this.buildings.update(this.snapshot.builds || []);
-    this.loot.update(this.snapshot.loot || [], dt);
+    this.loot.update(this.snapshot.loot || [], dt, groundHeight);
     this.storm.update(this.snapshot.storm);
     this.effects.update(dt, this.camera);
 
@@ -210,10 +211,18 @@ export class TwoWeeksGame {
         this.audio.pickup();
       }
       if (action.type === "fire") {
-        this.network.fire({ yaw: this.input.yaw, pitch: this.input.pitch });
         const self = this.snapshot.self;
         const item = self && self.inventory ? self.inventory[self.selectedSlot] : null;
-        this.audio.shoot(item ? item.weaponId : "pistol");
+        if (item && item.slotType === "consumable") {
+          this.network.useItem();
+          this.audio.pickup();
+        } else if (item && item.slotType === "weapon") {
+          this.network.fire({ yaw: this.input.yaw, pitch: this.input.pitch });
+          this.audio.shoot(item.weaponId || "pistol");
+        } else {
+          this.audio.denied();
+          this.ui.toast("Select a weapon or usable item.");
+        }
       }
       if (action.type === "placeBuild") {
         if (preview && preview.valid) {
