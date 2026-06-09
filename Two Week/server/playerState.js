@@ -3,6 +3,7 @@ const {
   MAP_SIZE,
   PLAYER_HEIGHT,
   clamp,
+  createConsumableInstance,
   createWeaponInstance,
   distance2D,
   normalizeAngle,
@@ -27,8 +28,14 @@ const PLAYER_COLORS = [
   "#fde047"
 ];
 
+function makeStartingInventory(includeMini = true) {
+  return includeMini
+    ? [createWeaponInstance("pistol_common"), createConsumableInstance("smallShield", 1), null, null, null]
+    : [createWeaponInstance("pistol_common"), null, null, null, null];
+}
+
 function createPlayer(socketId, name, index = 0, options = {}) {
-  const inventory = [createWeaponInstance("pistol"), null, null, null, null];
+  const inventory = makeStartingInventory(!options.isBot);
   return {
     id: socketId,
     socketId,
@@ -48,7 +55,7 @@ function createPlayer(socketId, name, index = 0, options = {}) {
     spectator: false,
     isBot: Boolean(options.isBot),
     health: 100,
-    shield: options.isBot ? 0 : 50,
+    shield: 0,
     materials: options.materials || 80,
     ammo: { ...AMMO_START },
     inventory,
@@ -84,10 +91,10 @@ function resetPlayerForMatch(player, spawn, mode) {
   player.alive = true;
   player.spectator = false;
   player.health = 100;
-  player.shield = player.isBot ? 0 : 50;
+  player.shield = 0;
   player.materials = mode === "sandbox" ? 9999 : mode === "practice" ? 400 : 90;
   player.ammo = { ...AMMO_START };
-  player.inventory = [createWeaponInstance("pistol"), null, null, null, null];
+  player.inventory = makeStartingInventory(!player.isBot);
   player.selectedSlot = 0;
   player.reloadEndsAt = 0;
   player.lastFireAt = 0;
@@ -120,6 +127,7 @@ function serializePlayer(player) {
     spectator: player.spectator,
     isBot: player.isBot,
     selectedSlot: player.selectedSlot,
+    selectedWeaponId: getHeldWeapon(player) ? getHeldWeapon(player).stats.id : null,
     materials: player.materials,
     eliminations: player.eliminations
   };
@@ -199,8 +207,16 @@ function applyInput(player, room, dt) {
   clampToArena(player);
 }
 
+function resolveInventoryIndex(player, index = player.selectedSlot) {
+  const clamped = clamp(Math.floor(Number(index)), 0, 4);
+  const slot = player.inventory[clamped];
+  if (!slot || slot.slotType !== "reserved") return clamped;
+  const parentIndex = player.inventory.findIndex((candidate) => candidate && candidate.instanceId === slot.parentInstanceId);
+  return parentIndex === -1 ? clamped : parentIndex;
+}
+
 function getHeldItem(player) {
-  return player.inventory[player.selectedSlot] || null;
+  return player.inventory[resolveInventoryIndex(player)] || null;
 }
 
 function getHeldWeapon(player) {
@@ -211,19 +227,72 @@ function getHeldWeapon(player) {
 }
 
 function selectSlot(player, slot) {
-  const index = clamp(Math.floor(Number(slot)), 0, 4);
+  const index = resolveInventoryIndex(player, slot);
   player.selectedSlot = index;
   player.reloadEndsAt = 0;
 }
 
-function addInventoryItem(player, item) {
-  const emptyIndex = player.inventory.findIndex((slot) => !slot);
-  if (emptyIndex !== -1) {
-    player.inventory[emptyIndex] = item;
-    return emptyIndex;
+function clearInventorySlot(player, index) {
+  const slot = player.inventory[index];
+  if (!slot) return;
+  if (slot.slotType === "reserved") {
+    const parentIndex = player.inventory.findIndex((candidate) => candidate && candidate.instanceId === slot.parentInstanceId);
+    if (parentIndex !== -1) clearInventorySlot(player, parentIndex);
+    player.inventory[index] = null;
+    return;
   }
-  player.inventory[player.selectedSlot] = item;
-  return player.selectedSlot;
+  if ((slot.slotSize || 1) > 1) {
+    for (let i = index + 1; i < Math.min(player.inventory.length, index + slot.slotSize); i += 1) {
+      if (player.inventory[i] && player.inventory[i].parentInstanceId === slot.instanceId) player.inventory[i] = null;
+    }
+  }
+  player.inventory[index] = null;
+}
+
+function placeInventoryItem(player, item, index) {
+  const size = Math.max(1, item.slotSize || 1);
+  for (let i = index; i < Math.min(player.inventory.length, index + size); i += 1) clearInventorySlot(player, i);
+  player.inventory[index] = item;
+  for (let i = 1; i < size && index + i < player.inventory.length; i += 1) {
+    player.inventory[index + i] = {
+      slotType: "reserved",
+      parentInstanceId: item.instanceId,
+      name: item.name || "Linked slot"
+    };
+  }
+  return index;
+}
+
+function findInventorySpace(player, size = 1) {
+  for (let i = 0; i <= player.inventory.length - size; i += 1) {
+    let open = true;
+    for (let j = 0; j < size; j += 1) {
+      if (player.inventory[i + j]) {
+        open = false;
+        break;
+      }
+    }
+    if (open) return i;
+  }
+  return -1;
+}
+
+function addInventoryItem(player, item) {
+  if (!item) return -1;
+  if (item.slotType === "consumable") {
+    const stackIndex = player.inventory.findIndex((slot) => slot && slot.slotType === "consumable" && slot.itemId === item.itemId && (slot.count || 1) < (slot.maxStack || 1));
+    if (stackIndex !== -1) {
+      const slot = player.inventory[stackIndex];
+      const moved = Math.min((item.count || 1), (slot.maxStack || 1) - (slot.count || 1));
+      slot.count = (slot.count || 1) + moved;
+      return stackIndex;
+    }
+  }
+  const size = Math.max(1, item.slotSize || 1);
+  const emptyIndex = findInventorySpace(player, size);
+  if (emptyIndex !== -1) return placeInventoryItem(player, item, emptyIndex);
+  const target = Math.min(resolveInventoryIndex(player), player.inventory.length - size);
+  return placeInventoryItem(player, item, Math.max(0, target));
 }
 
 function beginReload(player) {
@@ -236,8 +305,24 @@ function beginReload(player) {
   return true;
 }
 
+function rechargeChargeWeapons(player, time = Date.now()) {
+  for (const item of player.inventory) {
+    if (!item || item.slotType !== "weapon") continue;
+    const stats = WEAPON_STATS[item.weaponId];
+    if (!stats || stats.ammoType !== "charges" || item.ammoInMag >= stats.magazineSize) continue;
+    const interval = (stats.rechargeTime || 8) * 1000;
+    if (!item.lastChargeAt) item.lastChargeAt = time;
+    while (item.ammoInMag < stats.magazineSize && time - item.lastChargeAt >= interval) {
+      item.ammoInMag += 1;
+      item.lastChargeAt += interval;
+    }
+  }
+}
+
 function finishReloadIfReady(player) {
-  if (!player.reloadEndsAt || player.reloadEndsAt > Date.now()) return;
+  const time = Date.now();
+  rechargeChargeWeapons(player, time);
+  if (!player.reloadEndsAt || player.reloadEndsAt > time) return;
   const held = getHeldWeapon(player);
   if (!held) {
     player.reloadEndsAt = 0;
@@ -352,7 +437,7 @@ function makeBotOpponents(count = 11) {
 }
 
 function setupBotLoadout(bot, index = 0) {
-  const choices = ["assault", "shotgun", "pistol", "assault", "sniper"];
+  const choices = ["assault_rifle_uncommon", "pump_shotgun_rare", "smg_common", "burst_assault_rare", "bolt_sniper_epic"];
   bot.inventory[0] = createWeaponInstance(choices[index % choices.length]);
   bot.selectedSlot = 0;
   bot.shield = 25;

@@ -50,8 +50,17 @@ export class AudioManager {
   }
 
   shoot(weaponId = "pistol") {
-    const freq = weaponId === "sniper" ? 96 : weaponId === "shotgun" ? 120 : weaponId === "assault" ? 180 : 240;
-    this.playTone(freq, weaponId === "sniper" ? 0.22 : 0.09, "sawtooth", 0.2);
+    const id = String(weaponId || "pistol");
+    const isSniper = id.includes("sniper");
+    const isShotgun = id.includes("shotgun");
+    const isRocket = id.includes("rocket");
+    const isSmg = id.includes("smg");
+    const isBurst = id.includes("burst");
+    const isHeal = id.includes("bandage_launcher");
+    const freq = isRocket ? 72 : isSniper ? 96 : isShotgun ? 118 : isSmg ? 260 : isBurst ? 190 : isHeal ? 620 : id.includes("assault") ? 178 : 240;
+    const duration = isRocket ? 0.28 : isSniper ? 0.22 : isHeal ? 0.14 : 0.09;
+    this.playTone(freq, duration, isHeal ? "triangle" : "sawtooth", isRocket ? 0.24 : 0.2);
+    if (isRocket) setTimeout(() => this.playTone(46, 0.22, "sawtooth", 0.16), 80);
   }
 
   pickup() {

@@ -1,5 +1,5 @@
 import { escapeHtml, formatSeconds } from "./utils.js";
-import { getAmmoLabel, getWeaponLabel, WEAPON_STATS } from "./weapons.js";
+import { CONSUMABLE_STATS, getAmmoLabel, getItemColor, getWeaponLabel, WEAPON_STATS } from "./weapons.js";
 import { DEFAULT_KEYBINDS } from "./settings.js";
 
 const MAP_SIZE = 320;
@@ -350,10 +350,21 @@ export class UIManager {
     this.elements.inventory.innerHTML = self.inventory.map((item, index) => {
       const active = index === self.selectedSlot ? " active" : "";
       const label = getWeaponLabel(item);
-      const detail = item && item.slotType === "weapon" && WEAPON_STATS[item.weaponId]
-        ? `${item.ammoInMag}/${WEAPON_STATS[item.weaponId].magazineSize}`
-        : item && item.slotType === "consumable" ? item.kind : "";
-      return `<div class="slot${active}"><strong>${index + 1}</strong><br>${escapeHtml(label)}<br><span>${escapeHtml(detail)}</span></div>`;
+      const color = getItemColor(item);
+      let detail = "";
+      if (item && item.slotType === "weapon" && WEAPON_STATS[item.weaponId]) {
+        const stats = WEAPON_STATS[item.weaponId];
+        detail = stats.ammoType === "charges" ? item.ammoInMag + " charges" : item.ammoInMag + "/" + stats.magazineSize;
+      } else if (item && item.slotType === "consumable") {
+        const stats = CONSUMABLE_STATS[item.itemId] || item;
+        if (stats.kind === "shield") detail = "+" + (stats.amount || item.amount || 0) + " shield";
+        else if (stats.kind === "heal") detail = "+" + (stats.amount || item.amount || 0) + " HP";
+        else if (stats.kind === "explosive") detail = (stats.damage || item.damage || 0) + " dmg";
+        else detail = stats.kind || item.kind || "utility";
+      } else if (item && item.slotType === "reserved") {
+        detail = "two-slot item";
+      }
+      return '<div class="slot' + active + '" style="--slot-color: ' + escapeHtml(color) + '"><strong>' + (index + 1) + '</strong><br>' + escapeHtml(label) + '<br><span>' + escapeHtml(detail) + '</span></div>';
     }).join("");
   }
 

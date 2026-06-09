@@ -242,11 +242,16 @@ export class TwoWeeksGame {
   onCombatHit(result) {
     if (!result || !result.results) return;
     for (const item of result.results) {
-      if (item.type === "tracer") this.effects.tracer(item.from, item.to);
+      if (item.type === "tracer") this.effects.tracer(item.from, item.to, result.weaponId === "bandage_launcher_rare" ? "#38bdf8" : "#fde047");
+      if (item.type === "explosion" && item.center) this.effects.burst(item.center, "#fb923c");
+      if (item.type === "heal") {
+        const target = this.snapshot && this.snapshot.players.find((p) => p.id === item.targetId);
+        if (target && item.amount > 0) this.effects.damage("+" + item.amount, target, "#22c55e");
+      }
       if (item.type === "player") {
         const target = this.snapshot && this.snapshot.players.find((p) => p.id === item.targetId);
         if (target) {
-          this.effects.damage(String(item.damage), target, item.shieldDamage > 0 ? "#60a5fa" : "#facc15");
+          this.effects.damage((item.headshot ? "HEAD " : "") + String(item.damage), target, item.shieldDamage > 0 ? "#60a5fa" : "#facc15");
           this.effects.burst(target, item.eliminated ? "#fb7185" : "#2dd4bf");
         }
         if (result.shooterId === this.localId) {

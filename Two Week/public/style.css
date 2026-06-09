@@ -835,10 +835,10 @@ select {
 
 .slot {
   min-height: 56px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--slot-color, var(--line)) 58%, var(--line));
   border-radius: 8px;
   padding: 8px;
-  background: rgba(3, 7, 18, 0.62);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--slot-color, #0f172a) 16%, rgba(3, 7, 18, 0.72)), rgba(3, 7, 18, 0.62));
   font-size: 12px;
   font-weight: 800;
 }

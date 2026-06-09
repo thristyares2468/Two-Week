@@ -167,6 +167,10 @@ function attachGameServer(io) {
       const room = getRoomForSocket(socket);
       const player = room && room.players.get(socket.id);
       if (!room || !player || room.status !== "playing") return;
+      if (room.dropState && room.dropState.phase !== "active" && !player.droppedFromBus) {
+        socket.emit("server:error", "Drop from the bus before firing.");
+        return;
+      }
       const result = fireHitscan(room, player, payload);
       if (!result.ok) {
         socket.emit("server:error", result.reason);
@@ -202,10 +206,34 @@ function attachGameServer(io) {
     socket.on("item:use", () => {
       const room = getRoomForSocket(socket);
       const player = room && room.players.get(socket.id);
-      if (!player) return;
-      const result = useConsumable(player);
+      if (!room || !player) return;
+      const result = useConsumable(room, player);
       if (!result.ok) {
         socket.emit("server:error", result.reason);
+        return;
+      }
+      if (result.explosion) {
+        for (const hit of result.hits || []) {
+          if (hit.type === "player" && hit.eliminated) {
+            const defeated = [...room.players.values(), ...room.dummies].find((p) => p.id === hit.targetId);
+            addKillFeed(room, player.name + " eliminated " + (defeated ? defeated.name : "a target"));
+            io.to(room.roomCode).emit("combat:elimination", {
+              attackerId: player.id,
+              targetId: hit.targetId,
+              message: room.killFeed[room.killFeed.length - 1].message
+            });
+          }
+        }
+        io.to(room.roomCode).emit("combat:hit", {
+          ok: true,
+          shooterId: player.id,
+          weaponId: "grenade",
+          results: [
+            { type: "explosion", center: result.explosion.center, radius: result.explosion.radius },
+            ...(result.hits || [])
+          ]
+        });
+        rooms.maybeFinish(room);
       }
     });
 

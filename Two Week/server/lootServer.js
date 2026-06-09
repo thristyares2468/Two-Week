@@ -1,25 +1,47 @@
 const {
+  CONSUMABLE_STATS,
   WEAPON_STATS,
+  createConsumableInstance,
   createWeaponInstance,
   distance2D,
   makeId,
   randomFloat,
   randomPointInCircle
 } = require("./utils");
-const { addInventoryItem } = require("./playerState");
+const { addInventoryItem, applyDamage } = require("./playerState");
+
+const WEAPON_LOOT = [
+  ["pistol_common", 7], ["pistol_uncommon", 5], ["pistol_rare", 3], ["pistol_epic", 1.4], ["pistol_legendary", 0.8],
+  ["smg_common", 8], ["smg_uncommon", 6], ["smg_rare", 4], ["smg_epic", 1.8], ["smg_legendary", 1],
+  ["assault_rifle_common", 8], ["assault_rifle_uncommon", 7], ["assault_rifle_rare", 4.5], ["assault_rifle_epic", 2], ["assault_rifle_legendary", 1.1],
+  ["burst_assault_common", 6], ["burst_assault_uncommon", 5], ["burst_assault_rare", 3.6], ["burst_assault_epic", 1.7], ["burst_assault_legendary", 0.9],
+  ["pump_shotgun_common", 6], ["pump_shotgun_uncommon", 5], ["pump_shotgun_rare", 3.7], ["pump_shotgun_epic", 1.5], ["pump_shotgun_legendary", 0.85],
+  ["tactical_shotgun_common", 6], ["tactical_shotgun_uncommon", 5], ["tactical_shotgun_rare", 3.6], ["tactical_shotgun_epic", 1.4], ["tactical_shotgun_legendary", 0.8],
+  ["bolt_sniper_common", 2.3], ["bolt_sniper_uncommon", 2], ["bolt_sniper_rare", 1.5], ["bolt_sniper_epic", 0.85], ["bolt_sniper_legendary", 0.45],
+  ["rocket_launcher_rare", 0.75], ["rocket_launcher_epic", 0.4], ["rocket_launcher_legendary", 0.22],
+  ["bandage_launcher_rare", 0.45]
+];
+
+const CHEST_WEAPON_LOOT = WEAPON_LOOT.map(([weaponId, weight]) => {
+  const rarity = WEAPON_STATS[weaponId] && WEAPON_STATS[weaponId].rarity;
+  const bonus = rarity === "Legendary" ? 2.4 : rarity === "Epic" ? 2 : rarity === "Rare" ? 1.35 : 0.7;
+  return [weaponId, weight * bonus];
+});
 
 const LOOT_TABLE = [
-  { type: "weapon", weaponId: "assault", weight: 15 },
-  { type: "weapon", weaponId: "shotgun", weight: 12 },
-  { type: "weapon", weaponId: "sniper", weight: 7 },
+  ...WEAPON_LOOT.map(([weaponId, weight]) => ({ type: "weapon", weaponId, weight })),
   { type: "ammo", ammoType: "light", amount: 24, weight: 14 },
   { type: "ammo", ammoType: "medium", amount: 30, weight: 14 },
   { type: "ammo", ammoType: "shells", amount: 8, weight: 10 },
-  { type: "ammo", ammoType: "heavy", amount: 5, weight: 8 },
-  { type: "materials", amount: 35, weight: 14 },
-  { type: "shield", amount: 25, itemId: "smallShield", weight: 8 },
-  { type: "heal", amount: 35, itemId: "bandage", weight: 8 },
-  { type: "heal", amount: 70, itemId: "medkit", weight: 4 }
+  { type: "ammo", ammoType: "heavy", amount: 5, weight: 7 },
+  { type: "ammo", ammoType: "rockets", amount: 1, weight: 1.8 },
+  { type: "materials", amount: 35, weight: 13 },
+  { type: "consumable", itemId: "smallShield", count: 1, weight: 8 },
+  { type: "consumable", itemId: "shieldPotion", count: 1, weight: 4.4 },
+  { type: "consumable", itemId: "bandage", count: 3, weight: 8 },
+  { type: "consumable", itemId: "medkit", count: 1, weight: 3.4 },
+  { type: "consumable", itemId: "grenade", count: 3, weight: 5 },
+  { type: "consumable", itemId: "fishingRod", count: 1, weight: 2.2 }
 ];
 
 const NAMED_LOOT_POINTS = [
@@ -49,14 +71,20 @@ const FIELD_CONTAINER_POINTS = [
   { x: 64, z: -4, type: "ammoBox" }
 ];
 
-function weightedLoot() {
-  const total = LOOT_TABLE.reduce((sum, item) => sum + item.weight, 0);
+function weightedChoice(table) {
+  const total = table.reduce((sum, item) => sum + (Array.isArray(item) ? item[1] : item.weight), 0);
   let roll = Math.random() * total;
-  for (const item of LOOT_TABLE) {
-    roll -= item.weight;
-    if (roll <= 0) return item;
+  for (const item of table) {
+    const weight = Array.isArray(item) ? item[1] : item.weight;
+    roll -= weight;
+    if (roll <= 0) return Array.isArray(item) ? item[0] : item;
   }
-  return LOOT_TABLE[0];
+  const fallback = table[0];
+  return Array.isArray(fallback) ? fallback[0] : fallback;
+}
+
+function weightedLoot() {
+  return weightedChoice(LOOT_TABLE);
 }
 
 function createLootItem(template, position, source = "ground") {
@@ -73,25 +101,31 @@ function createLootItem(template, position, source = "ground") {
     item.name = template.type === "chest" ? "Chest" : "Ammo Box";
     item.container = true;
     item.y = template.type === "chest" ? 0.8 : 0.55;
-  }
-  if (template.type === "weapon") {
-    item.weaponId = template.weaponId;
-    item.name = WEAPON_STATS[template.weaponId].name;
-    item.rarity = WEAPON_STATS[template.weaponId].rarity;
-  }
-  if (template.type === "ammo") {
+  } else if (template.type === "weapon") {
+    const stats = WEAPON_STATS[template.weaponId] || WEAPON_STATS.pistol_common;
+    item.weaponId = stats.id;
+    item.name = stats.name;
+    item.rarity = stats.rarity;
+    item.color = stats.color;
+  } else if (template.type === "ammo") {
     item.ammoType = template.ammoType;
     item.amount = template.amount;
-    item.name = `${template.ammoType} ammo`;
-  }
-  if (template.type === "materials") {
+    item.name = template.ammoType + " ammo";
+  } else if (template.type === "materials") {
     item.amount = template.amount;
     item.name = "Materials";
-  }
-  if (template.type === "shield" || template.type === "heal") {
-    item.amount = template.amount;
-    item.itemId = template.itemId;
-    item.name = template.itemId === "medkit" ? "Medkit" : template.itemId === "bandage" ? "Bandage" : "Small Shield";
+  } else if (template.type === "consumable") {
+    const stats = CONSUMABLE_STATS[template.itemId] || CONSUMABLE_STATS.smallShield;
+    item.type = stats.kind;
+    item.itemId = stats.itemId;
+    item.kind = stats.kind;
+    item.amount = stats.amount || 0;
+    item.damage = stats.damage || 0;
+    item.radius = stats.radius || 0;
+    item.count = template.count || 1;
+    item.name = stats.name;
+    item.rarity = stats.rarity;
+    item.color = stats.color;
   }
   return item;
 }
@@ -99,7 +133,7 @@ function createLootItem(template, position, source = "ground") {
 function spawnLoot(room) {
   room.loot.clear();
   for (const point of NAMED_LOOT_POINTS) {
-    const count = room.roomType === "sandbox" ? 2 : 5;
+    const count = room.roomType === "sandbox" ? 3 : 7;
     for (let i = 0; i < count; i += 1) {
       const pos = {
         x: point.x + randomFloat(-14, 14),
@@ -108,7 +142,7 @@ function spawnLoot(room) {
       const item = createLootItem(weightedLoot(), pos, point.name);
       room.loot.set(item.id, item);
     }
-    const containerScale = room.roomType === "sandbox" ? 0.5 : 1;
+    const containerScale = room.roomType === "sandbox" ? 0.6 : 1;
     for (let i = 0; i < Math.ceil(point.chest * containerScale); i += 1) {
       const pos = {
         x: point.x + randomFloat(-18, 18),
@@ -126,8 +160,8 @@ function spawnLoot(room) {
       room.loot.set(item.id, item);
     }
   }
-  for (let i = 0; i < 34; i += 1) {
-    const pos = randomPointInCircle(108);
+  for (let i = 0; i < 44; i += 1) {
+    const pos = randomPointInCircle(118);
     const item = createLootItem(weightedLoot(), pos, "field");
     room.loot.set(item.id, item);
   }
@@ -153,43 +187,48 @@ function pickupLoot(room, player, lootId) {
     grantAmmoBoxReward(player);
   } else if (item.type === "weapon") {
     addInventoryItem(player, createWeaponInstance(item.weaponId));
+    grantAmmoForWeapon(player, item.weaponId, 0.45);
   } else if (item.type === "ammo") {
     player.ammo[item.ammoType] = (player.ammo[item.ammoType] || 0) + item.amount;
   } else if (item.type === "materials") {
     player.materials += item.amount;
-  } else if (item.type === "shield" || item.type === "heal") {
-    addInventoryItem(player, {
-      slotType: "consumable",
-      instanceId: makeId("item"),
-      itemId: item.itemId,
-      kind: item.type,
-      amount: item.amount,
-      name: item.name
-    });
+  } else if (item.itemId) {
+    addInventoryItem(player, createConsumableInstance(item.itemId, item.count || 1));
   }
 
   room.loot.delete(item.id);
   return { ok: true, item };
 }
 
+function grantAmmoForWeapon(player, weaponId, scale = 1) {
+  const stats = WEAPON_STATS[weaponId];
+  if (!stats || stats.ammoType === "charges") return;
+  const amountByType = {
+    light: 30,
+    medium: 36,
+    shells: 10,
+    heavy: 5,
+    rockets: 1
+  };
+  const amount = Math.max(1, Math.round((amountByType[stats.ammoType] || 12) * scale));
+  player.ammo[stats.ammoType] = (player.ammo[stats.ammoType] || 0) + amount;
+}
+
 function grantChestReward(player) {
-  const weaponRoll = Math.random();
-  const weaponId = weaponRoll > 0.74 ? "sniper" : weaponRoll > 0.42 ? "shotgun" : "assault";
+  const weaponId = weightedChoice(CHEST_WEAPON_LOOT);
   addInventoryItem(player, createWeaponInstance(weaponId));
+  grantAmmoForWeapon(player, weaponId, 1.15);
   player.materials += 25 + Math.floor(Math.random() * 35);
-  player.ammo.light = (player.ammo.light || 0) + 12 + Math.floor(Math.random() * 16);
-  player.ammo.medium = (player.ammo.medium || 0) + 18 + Math.floor(Math.random() * 20);
-  player.ammo.shells = (player.ammo.shells || 0) + 4 + Math.floor(Math.random() * 6);
-  if (Math.random() > 0.45) {
-    const shield = Math.random() > 0.45;
-    addInventoryItem(player, {
-      slotType: "consumable",
-      instanceId: makeId("item"),
-      itemId: shield ? "smallShield" : "bandage",
-      kind: shield ? "shield" : "heal",
-      amount: 25,
-      name: shield ? "Small Shield" : "Bandage"
-    });
+  if (Math.random() > 0.35) {
+    const itemId = weightedChoice([
+      ["smallShield", 5],
+      ["shieldPotion", 2.7],
+      ["bandage", 3.3],
+      ["medkit", 1.8],
+      ["grenade", 2.1],
+      ["fishingRod", 0.8]
+    ]);
+    addInventoryItem(player, createConsumableInstance(itemId, itemId === "bandage" ? 3 : itemId === "grenade" ? 3 : 1));
   }
 }
 
@@ -198,28 +237,70 @@ function grantAmmoBoxReward(player) {
   player.ammo.medium = (player.ammo.medium || 0) + 24 + Math.floor(Math.random() * 22);
   player.ammo.shells = (player.ammo.shells || 0) + 4 + Math.floor(Math.random() * 8);
   player.ammo.heavy = (player.ammo.heavy || 0) + 2 + Math.floor(Math.random() * 4);
+  if (Math.random() > 0.72) player.ammo.rockets = (player.ammo.rockets || 0) + 1;
 }
 
-function useConsumable(player) {
+function consumeSelected(player, item) {
+  item.count = (item.count || 1) - 1;
+  if (item.count <= 0) player.inventory[player.selectedSlot] = null;
+}
+
+function useConsumable(room, player) {
   const item = player.inventory[player.selectedSlot];
   if (!item || item.slotType !== "consumable") return { ok: false, reason: "No consumable selected." };
   let applied = 0;
   if (item.kind === "shield") {
     const before = player.shield;
-    player.shield = Math.min(100, player.shield + item.amount);
+    player.shield = Math.min(item.maxShield || 100, player.shield + item.amount);
     applied = player.shield - before;
   } else if (item.kind === "heal") {
     const before = player.health;
-    player.health = Math.min(100, player.health + item.amount);
+    player.health = Math.min(item.maxHealth || 100, player.health + item.amount);
     applied = player.health - before;
+  } else if (item.kind === "explosive") {
+    const explosion = throwGrenade(room, player, item);
+    consumeSelected(player, item);
+    return { ok: true, item, applied: 0, explosion, hits: explosion.hits };
+  } else if (item.kind === "utility") {
+    return { ok: true, item, applied: 0, message: "No fishing spot here yet." };
   }
   if (applied <= 0) return { ok: false, reason: "Already full." };
-  player.inventory[player.selectedSlot] = null;
+  consumeSelected(player, item);
   return { ok: true, item, applied };
+}
+
+function throwGrenade(room, player, item) {
+  const radius = item.radius || 7.5;
+  const center = {
+    x: player.x + Math.sin(player.yaw) * 13,
+    y: player.y + 1.2,
+    z: player.z + Math.cos(player.yaw) * 13
+  };
+  const hits = [];
+  const candidates = [...room.players.values(), ...room.dummies];
+  for (const target of candidates) {
+    if (!target.alive || target.id === player.id) continue;
+    const d = distance2D(target, center);
+    if (d > radius) continue;
+    const falloff = 1 - d / radius * 0.45;
+    const damage = Math.max(1, Math.round((item.damage || 100) * falloff));
+    const outcome = applyDamage(target, damage, player, "grenade", room);
+    hits.push({
+      type: "player",
+      targetId: target.id,
+      damage,
+      shieldDamage: Math.round(outcome.shieldDamage),
+      healthDamage: Math.round(outcome.healthDamage),
+      eliminated: outcome.eliminated,
+      distance: d
+    });
+  }
+  return { center, radius, hits };
 }
 
 module.exports = {
   FIELD_CONTAINER_POINTS,
+  LOOT_TABLE,
   NAMED_LOOT_POINTS,
   pickupLoot,
   serializeLoot,

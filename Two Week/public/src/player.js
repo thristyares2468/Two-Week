@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { lerp, makeTextSprite, normalizeAngle } from "./utils.js";
+import { WEAPON_STATS } from "./weapons.js";
 
 const PLAYER_VISUAL_SCALE = 0.62;
 
@@ -28,6 +29,7 @@ export class PlayerRenderer {
       entry.group.visible = state.alive || state.id === localId || state.isBot;
       entry.healthFill.scale.x = Math.max(0.02, (state.health + state.shield) / 200);
       entry.healthFill.material.color.set(state.shield > 0 ? "#60a5fa" : "#84cc16");
+      if (entry.weaponId !== state.selectedWeaponId) updateHeldWeapon(entry, state.selectedWeaponId);
       entry.label.visible = state.id !== localId;
       entry.bar.visible = state.id !== localId;
       if (camera) {
@@ -75,6 +77,21 @@ export class PlayerRenderer {
     pack.position.set(0, 1.65, -0.72);
     model.add(pack);
 
+    const leftArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.9, 3, 6), bodyMat);
+    leftArm.position.set(-0.66, 1.72, 0.22);
+    leftArm.rotation.x = -0.75;
+    leftArm.castShadow = true;
+    const rightArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.9, 3, 6), bodyMat);
+    rightArm.position.set(0.66, 1.72, 0.24);
+    rightArm.rotation.x = -0.85;
+    rightArm.castShadow = true;
+    model.add(leftArm, rightArm);
+
+    const weaponMount = new THREE.Group();
+    weaponMount.position.set(0.48, 1.43, 0.78);
+    weaponMount.rotation.set(-0.08, 0.08, -0.08);
+    model.add(weaponMount);
+
     const label = makeTextSprite(THREE, state.name || "Runner", {
       width: 220,
       height: 54,
@@ -101,13 +118,68 @@ export class PlayerRenderer {
     bar.add(bg, healthFill);
     group.add(bar);
 
-    return { group, model, body, label, bar, healthFill };
+    return { group, model, body, label, bar, healthFill, weaponMount, weaponId: null, heldWeapon: null };
   }
 
   getPosition(id) {
     const entry = this.players.get(id);
     return entry ? entry.group.position : null;
   }
+}
+
+function updateHeldWeapon(entry, weaponId) {
+  if (entry.heldWeapon) {
+    entry.weaponMount.remove(entry.heldWeapon);
+    disposeObject(entry.heldWeapon);
+    entry.heldWeapon = null;
+  }
+  entry.weaponId = weaponId || null;
+  if (!weaponId) return;
+  entry.heldWeapon = createHeldWeapon(weaponId);
+  entry.weaponMount.add(entry.heldWeapon);
+}
+
+function createHeldWeapon(weaponId) {
+  const stats = WEAPON_STATS[weaponId] || WEAPON_STATS.pistol;
+  const color = stats.color || "#dbeafe";
+  const group = new THREE.Group();
+  const main = new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.08 });
+  const dark = new THREE.MeshStandardMaterial({ color: "#0f172a", roughness: 0.8 });
+  const metal = new THREE.MeshStandardMaterial({ color: "#94a3b8", roughness: 0.45, metalness: 0.18 });
+  const model = stats.model || "pistol";
+  if (model === "pistol") {
+    group.add(heldBox(0.52, 0.18, 0.22, main, 0, 0, 0));
+    group.add(heldBox(0.14, 0.38, 0.16, dark, -0.13, -0.22, 0, 0, 0, -0.18));
+    group.add(heldBarrel(0.04, 0.4, metal, 0.38, 0.02, 0));
+  } else if (model === "rocket" || model === "medLauncher") {
+    group.add(heldBarrel(0.14, 1.18, main, 0.22, 0.04, 0));
+    group.add(heldBox(0.22, 0.34, 0.18, dark, -0.24, -0.18, 0));
+  } else {
+    const length = model === "sniper" ? 1.3 : model.includes("shotgun") || model === "pump" || model === "tactical" ? 1.05 : 0.95;
+    group.add(heldBox(length, 0.2, 0.24, main, 0, 0, 0));
+    group.add(heldBarrel(0.035, length * 0.74, metal, length * 0.55, 0.03, 0));
+    group.add(heldBox(0.16, 0.42, 0.16, dark, -0.1, -0.26, 0, 0, 0, -0.12));
+    if (model === "sniper" || model === "burst") group.add(heldBarrel(0.06, 0.36, dark, 0.05, 0.24, 0, Math.PI / 2, 0, 0));
+  }
+  group.rotation.y = Math.PI / 2;
+  group.scale.setScalar(0.82);
+  return group;
+}
+
+function heldBox(w, h, d, material, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(rx, ry, rz);
+  mesh.castShadow = true;
+  return mesh;
+}
+
+function heldBarrel(radius, length, material, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = Math.PI / 2) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 8), material);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(rx, ry, rz);
+  mesh.castShadow = true;
+  return mesh;
 }
 
 function lerpAngle(a, b, t) {
